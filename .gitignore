@@ -1,0 +1,13 @@
+.vscode
+.coverage
+__pycache__/
+*.pyc
+env/
+_trial_temp/
+
+/.eggs/
+/.idea/
+/.tox/
+/build/
+/dist/
+/*.egg-info/

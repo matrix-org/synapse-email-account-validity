@@ -1,6 +1,20 @@
+# -*- coding: utf-8 -*-
+# Copyright 2021 The Matrix.org Foundation C.I.C.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from twisted.web.resource import Resource
 
-from synapse.api.errors import AuthError, SynapseError
 from synapse.config._base import Config, ConfigError
 from synapse.http.server import (
     DirectServeHtmlResource,
@@ -8,6 +22,7 @@ from synapse.http.server import (
     respond_with_html,
 )
 from synapse.module_api import ModuleApi
+from synapse.module_api.errors import SynapseError
 
 from email_account_validity._base import EmailAccountValidityBase
 from email_account_validity._store import EmailAccountValidityStore
@@ -122,7 +137,7 @@ class EmailAccountValidityAdminServlet(
     async def _async_render_POST(self, request):
         requester = await self._api.get_user_by_req(request)
         if not await self._api.is_user_admin(requester.user.to_string()):
-            raise AuthError(403, "You are not a server admin")
+            raise SynapseError(403, "You are not a server admin", "M_FORBIDDEN")
 
         expiration_ts = await self.set_account_validity_from_request(request)
 

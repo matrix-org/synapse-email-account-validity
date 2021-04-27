@@ -34,6 +34,10 @@ class EmailAccountValidityStore:
         self._rand = random.SystemRandom()
 
     async def create_and_populate_table(self):
+        """Create the email_account_validity table and populate it from other tables from
+        within Synapse. It populates users in it by batches of 100 in order not to clog up
+        the database connection with big requests.
+        """
         def create_table_txn(txn: LoggingTransaction):
             # Try to create a table for the module.
             txn.execute(
@@ -124,8 +128,8 @@ class EmailAccountValidityStore:
             create_table_txn,
         )
 
-        batch_size = 10
-        processed_rows = 10
+        batch_size = 100
+        processed_rows = 100
         while processed_rows == batch_size:
             processed_rows = await self._api.run_db_interaction(
                 "account_validity_populate_table",

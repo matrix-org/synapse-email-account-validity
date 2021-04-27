@@ -16,6 +16,8 @@
 import logging
 from typing import Any, Tuple
 
+from twisted.web.server import Request
+
 from synapse.config._base import Config, ConfigError
 from synapse.module_api import ModuleApi, run_in_background
 
@@ -42,6 +44,8 @@ class EmailAccountValidity(EmailAccountValidityBase):
 
     @staticmethod
     def parse_config(config: dict):
+        """Check that the configuration includes the required keys and parse the values
+        expressed as durations."""
         if "period" not in config:
             raise ConfigError("'period' is required when using email account validity")
 
@@ -54,16 +58,55 @@ class EmailAccountValidity(EmailAccountValidityBase):
         config["renew_at"] = Config.parse_duration(config.get("renew_at") or 0)
         return config
 
-    async def on_legacy_renew(self, renewal_token):
+    async def on_legacy_renew(self, renewal_token: str) -> Tuple[bool, bool, int]:
+        """Attempt to renew an account and return the results of this attempt to the
+        deprecated /renew servlet.
+
+        Args:
+            renewal_token: Token sent with the renewal request.
+
+        Returns:
+            A tuple containing:
+              * A bool representing whether the token is valid and unused.
+              * A bool which is `True` if the token is valid, but stale.
+              * An int representing the user's expiry timestamp as milliseconds since the
+                epoch, or 0 if the token was invalid.
+        """
         return await self.renew_account(renewal_token)
 
-    async def on_legacy_send_mail(self, user_id):
+    async def on_legacy_send_mail(self, user_id: str):
+        """Sends a renewal email to the addresses associated with the given Matrix user
+        ID.
+
+        Args:
+            user_id: The user ID to send a renewal email for.
+        """
         await self.send_renewal_email_to_user(user_id)
 
-    async def on_legacy_admin_request(self, request):
+    async def on_legacy_admin_request(self, request: Request) -> int:
+        """Update the account validity state of a user using the data from the given
+        request.
+
+        Args:
+            request: The request to extract data from.
+
+        Returns:
+            The new expiration timestamp for the updated user.
+        """
         return await self.set_account_validity_from_request(request)
 
     async def user_expired(self, user_id: str) -> Tuple[bool, bool]:
+        """Checks whether a user is expired.
+
+        Args:
+            user_id: The user to check the expiration state for.
+
+        Returns:
+            * A boolean indicating whether the user is expired.
+            * A boolean indicating whether it was possible to determine whether the user
+              is expired. Will be False if no expiration timestamp is associated with the
+              user.
+        """
         expiration_ts = await self._store.get_expiration_ts_for_user(user_id)
         if expiration_ts is None:
             return False, False
@@ -72,6 +115,11 @@ class EmailAccountValidity(EmailAccountValidityBase):
         return now_ts >= expiration_ts, True
 
     async def on_user_registration(self, user_id: str):
+        """Set the expiration timestamp for a newly registered user.
+
+        Args:
+            user_id: The ID of the newly registered user to set an expiration date for.
+        """
         await self._store.set_expiration_date_for_user(user_id)
 
     async def _send_renewal_emails(self):

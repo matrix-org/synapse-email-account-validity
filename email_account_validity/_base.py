@@ -249,6 +249,15 @@ class EmailAccountValidityBase:
         return expiration_ts
 
     async def set_account_validity_from_request(self, request: Request) -> int:
+        """Set the account validity state of a user from a request's body. The body is
+        expected to match the format for admin requests.
+
+        Args:
+            request: The request to extract data from.
+
+        Returns:
+            The new expiration timestamp for the updated user.
+        """
         body = parse_json_object_from_request(request)
 
         if "user_id" not in body:

@@ -1,11 +1,17 @@
+import logging
 from typing import Any, Optional, Tuple
 
+from twisted.web.server import Request
+
 from synapse.api.errors import StoreError, SynapseError
+from synapse.http.servlet import parse_json_object_from_request
 from synapse.module_api import ModuleApi
 from synapse.types import UserID
 from synapse.util import stringutils
 
 from email_account_validity._store import EmailAccountValidityStore
+
+logger = logging.getLogger(__name__)
 
 
 class EmailAccountValidityBase:
@@ -193,6 +199,7 @@ class EmailAccountValidityBase:
         expiration_ts: Optional[int] = None,
         email_sent: bool = False,
         renewal_token: Optional[str] = None,
+        error_if_user_not_found: bool = False,
     ) -> int:
         """Renews the account attached to a given user by pushing back the
         expiration date by the current validity period in the server's
@@ -204,6 +211,8 @@ class EmailAccountValidityBase:
             email_sent: Whether an email has been sent for this validity period.
             renewal_token: Token sent with the renewal request. The user's token
                 will be cleared if this is None.
+            error_if_user_not_found: Whether to raise an error if the user to update
+                wasn't found.
 
         Returns:
             New expiration date for this account, as a timestamp in
@@ -219,6 +228,20 @@ class EmailAccountValidityBase:
             email_sent=email_sent,
             renewal_token=renewal_token,
             token_used_ts=now,
+            error_if_user_not_found=error_if_user_not_found,
         )
 
         return expiration_ts
+
+    async def set_account_validity_from_request(self, request: Request) -> int:
+        body = parse_json_object_from_request(request)
+
+        if "user_id" not in body:
+            raise SynapseError(400, "Missing property 'user_id' in the request body")
+
+        return await self.renew_account_for_user(
+            body["user_id"],
+            body.get("expiration_ts"),
+            not body.get("enable_renewal_emails", True),
+            error_if_user_not_found=True,
+        )

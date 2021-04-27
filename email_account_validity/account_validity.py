@@ -45,6 +45,9 @@ class EmailAccountValidity(EmailAccountValidityBase):
     async def on_legacy_send_mail(self, user_id):
         await self.send_renewal_email_to_user(user_id)
 
+    async def on_legacy_admin_request(self, request):
+        return await self.set_account_validity_from_request(request)
+
     async def user_expired(self, user_id: str) -> Tuple[bool, bool]:
         expiration_ts = await self._store.get_expiration_ts_for_user(user_id)
         if expiration_ts is None:

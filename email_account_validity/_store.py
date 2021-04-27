@@ -3,6 +3,7 @@ import random
 from typing import Dict, List, Optional, Tuple, Union
 
 from synapse.module_api import ModuleApi
+from synapse.module_api.errors import SynapseError
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.util.caches.descriptors import cached
 
@@ -155,6 +156,7 @@ class EmailAccountValidityStore:
         email_sent: bool,
         renewal_token: Optional[str] = None,
         token_used_ts: Optional[int] = None,
+        error_if_user_not_found: bool = False,
     ):
         """Updates the account validity properties of the given account, with the
         given values.
@@ -170,10 +172,13 @@ class EmailAccountValidityStore:
                 of their account. Defaults to no token.
             token_used_ts: A timestamp of when the current token was used to renew
                 the account.
+            error_if_user_not_found: Whether to raise an error if the user to update
+                wasn't found.
+
         """
 
         def set_account_validity_for_user_txn(txn: LoggingTransaction):
-            DatabasePool.simple_update_txn(
+            count = DatabasePool.simple_update_txn(
                 txn=txn,
                 table="email_account_validity",
                 keyvalues={"user_id": user_id},
@@ -184,6 +189,9 @@ class EmailAccountValidityStore:
                     "token_used_ts_ms": token_used_ts,
                 },
             )
+
+            if count == 0 and error_if_user_not_found:
+                raise SynapseError(404, "No matching user found")
 
             txn.call_after(self.get_expiration_ts_for_user.invalidate, (user_id,))
 

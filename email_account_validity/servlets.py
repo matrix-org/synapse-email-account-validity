@@ -1,6 +1,6 @@
 from twisted.web.resource import Resource
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import AuthError, SynapseError
 from synapse.config._base import Config, ConfigError
 from synapse.http.server import (
     DirectServeHtmlResource,
@@ -18,6 +18,7 @@ class EmailAccountValidityServlet(Resource):
         super().__init__()
         self.putChild(b'renew', EmailAccountValidityRenewServlet(config, api))
         self.putChild(b'send_mail', EmailAccountValiditySendMailServlet(config, api))
+        self.putChild(b'admin', EmailAccountValidityAdminServlet(config, api))
 
     @staticmethod
     def parse_config(config: dict) -> dict:
@@ -90,7 +91,9 @@ class EmailAccountValiditySendMailServlet(
 ):
     def __init__(self, config: dict, api: ModuleApi):
         store = EmailAccountValidityStore(config, api)
-        super().__init__(config, api, store)
+
+        EmailAccountValidityBase.__init__(self, config, api, store)
+        DirectServeJsonResource.__init__(self)
 
         if not api.public_baseurl:
             raise ConfigError("Can't send renewal emails without 'public_baseurl'")
@@ -99,8 +102,29 @@ class EmailAccountValiditySendMailServlet(
         """On POST requests on /send_mail, send a renewal email to the account the access
         token authenticating the request belongs to.
         """
-        requester = await self.api.get_user_by_req(request, allow_expired=True)
+        requester = await self._api.get_user_by_req(request, allow_expired=True)
         user_id = requester.user.to_string()
         await self.send_renewal_email_to_user(user_id)
 
         return 200, {}
+
+
+class EmailAccountValidityAdminServlet(
+    EmailAccountValidityBase,
+    DirectServeJsonResource,
+):
+    def __init__(self, config: dict, api: ModuleApi):
+        store = EmailAccountValidityStore(config, api)
+
+        EmailAccountValidityBase.__init__(self, config, api, store)
+        DirectServeJsonResource.__init__(self)
+
+    async def _async_render_POST(self, request):
+        requester = await self._api.get_user_by_req(request)
+        if not await self._api.is_user_admin(requester.user.to_string()):
+            raise AuthError(403, "You are not a server admin")
+
+        expiration_ts = await self.set_account_validity_from_request(request)
+
+        res = {"expiration_ts": expiration_ts}
+        return 200, res

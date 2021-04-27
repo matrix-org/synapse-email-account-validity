@@ -107,7 +107,7 @@ class EmailAccountValidityBase:
 
         renewal_token = await self.generate_renewal_token(user_id)
 
-        url = "%s_synapse/client/account_validity/renew?token=%s" % (
+        url = "%s_synapse/client/email_account_validity/renew?token=%s" % (
             self._api.public_baseurl,
             renewal_token,
         )

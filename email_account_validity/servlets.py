@@ -135,6 +135,9 @@ class EmailAccountValidityAdminServlet(
         DirectServeJsonResource.__init__(self)
 
     async def _async_render_POST(self, request):
+        """On POST requests on /admin, update the given user with the given account
+        validity state, if the requester is a server admin.
+        """
         requester = await self._api.get_user_by_req(request)
         if not await self._api.is_user_admin(requester.user.to_string()):
             raise SynapseError(403, "You are not a server admin", "M_FORBIDDEN")

@@ -42,6 +42,9 @@ Also under the HTTP client `listener`, configure an `additional_resource` as per
 
 The syntax for durations is the same as in the rest of Synapse's configuration file.
 
+If they are not already there, copy the [templates](/email_account_validity/templates)
+into Synapse's templates directory.
+
 ## Routes
 
 This plugin exposes three HTTP routes to manage account validity:

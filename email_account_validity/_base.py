@@ -214,7 +214,6 @@ class EmailAccountValidityBase:
         expiration_ts: Optional[int] = None,
         email_sent: bool = False,
         renewal_token: Optional[str] = None,
-        error_if_user_not_found: bool = False,
     ) -> int:
         """Renews the account attached to a given user by pushing back the
         expiration date by the current validity period in the server's
@@ -226,8 +225,6 @@ class EmailAccountValidityBase:
             email_sent: Whether an email has been sent for this validity period.
             renewal_token: Token sent with the renewal request. The user's token
                 will be cleared if this is None.
-            error_if_user_not_found: Whether to raise an error if the user to update
-                wasn't found.
 
         Returns:
             New expiration date for this account, as a timestamp in
@@ -243,7 +240,6 @@ class EmailAccountValidityBase:
             email_sent=email_sent,
             renewal_token=renewal_token,
             token_used_ts=now,
-            error_if_user_not_found=error_if_user_not_found,
         )
 
         return expiration_ts
@@ -267,5 +263,4 @@ class EmailAccountValidityBase:
             body["user_id"],
             body.get("expiration_ts"),
             not body.get("enable_renewal_emails", True),
-            error_if_user_not_found=True,
         )

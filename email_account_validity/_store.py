@@ -18,7 +18,6 @@ import random
 from typing import Dict, List, Optional, Tuple, Union
 
 from synapse.module_api import ModuleApi
-from synapse.module_api.errors import SynapseError
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.util.caches.descriptors import cached
 
@@ -33,7 +32,7 @@ class EmailAccountValidityStore:
         self._expiration_ts_max_delta = self._period * 10.0 / 100.0
         self._rand = random.SystemRandom()
 
-    async def create_and_populate_table(self):
+    async def create_and_populate_table(self, populate_users: bool = True):
         """Create the email_account_validity table and populate it from other tables from
         within Synapse. It populates users in it by batches of 100 in order not to clog up
         the database connection with big requests.
@@ -128,18 +127,19 @@ class EmailAccountValidityStore:
             create_table_txn,
         )
 
-        batch_size = 100
-        processed_rows = 100
-        while processed_rows == batch_size:
-            processed_rows = await self._api.run_db_interaction(
-                "account_validity_populate_table",
-                populate_table_txn,
-                batch_size,
-            )
-            logger.info(
-                "Inserted %s users in the email account validity table",
-                processed_rows,
-            )
+        if populate_users:
+            batch_size = 100
+            processed_rows = 100
+            while processed_rows == batch_size:
+                processed_rows = await self._api.run_db_interaction(
+                    "account_validity_populate_table",
+                    populate_table_txn,
+                    batch_size,
+                )
+                logger.info(
+                    "Inserted %s users in the email account validity table",
+                    processed_rows,
+                )
 
     async def get_users_expiring_soon(self) -> List[Dict[str, Union[str, int]]]:
         """Selects users whose account will expire in the [now, now + renew_at] time
@@ -175,7 +175,6 @@ class EmailAccountValidityStore:
         email_sent: bool,
         renewal_token: Optional[str] = None,
         token_used_ts: Optional[int] = None,
-        error_if_user_not_found: bool = False,
     ):
         """Updates the account validity properties of the given account, with the
         given values.
@@ -191,26 +190,28 @@ class EmailAccountValidityStore:
                 of their account. Defaults to no token.
             token_used_ts: A timestamp of when the current token was used to renew
                 the account.
-            error_if_user_not_found: Whether to raise an error if the user to update
-                wasn't found.
-
         """
 
         def set_account_validity_for_user_txn(txn: LoggingTransaction):
-            count = DatabasePool.simple_update_txn(
-                txn=txn,
-                table="email_account_validity",
-                keyvalues={"user_id": user_id},
-                updatevalues={
-                    "expiration_ts_ms": expiration_ts,
-                    "email_sent": email_sent,
-                    "renewal_token": renewal_token,
-                    "token_used_ts_ms": token_used_ts,
-                },
+            txn.execute(
+                """
+                INSERT INTO email_account_validity (
+                    user_id,
+                    expiration_ts_ms,
+                    email_sent,
+                    renewal_token,
+                    token_used_ts_ms
+                )
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT (user_id) DO UPDATE
+                SET
+                    expiration_ts_ms = EXCLUDED.expiration_ts_ms,
+                    email_sent = EXCLUDED.email_sent,
+                    renewal_token = EXCLUDED.renewal_token,
+                    token_used_ts_ms = EXCLUDED.token_used_ts_ms
+                """,
+                (user_id, expiration_ts, email_sent, renewal_token, token_used_ts)
             )
-
-            if count == 0 and error_if_user_not_found:
-                raise SynapseError(404, "No matching user found")
 
             txn.call_after(self.get_expiration_ts_for_user.invalidate, (user_id,))
 
@@ -328,6 +329,8 @@ class EmailAccountValidityStore:
 
         txn.execute(sql, (user_id, expiration_ts, False))
 
+        txn.call_after(self.get_expiration_ts_for_user.invalidate, (user_id,))
+
     async def set_renewal_mail_status(self, user_id: str, email_sent: bool) -> None:
         """Sets or unsets the flag that indicates whether a renewal email has been sent
         to the user (and the user hasn't renewed their account yet).
@@ -349,4 +352,27 @@ class EmailAccountValidityStore:
         await self._api.run_db_interaction(
             "set_renewal_mail_status",
             set_renewal_mail_status_txn,
+        )
+
+    async def get_renewal_token_for_user(self, user_id: str) -> str:
+        """Retrieve the renewal token for the given user.
+
+        Args:
+            user_id: Matrix ID of the user to retrieve the renewal token of.
+
+        Returns:
+            The renewal token for the user.
+        """
+
+        def get_renewal_token_txn(txn: LoggingTransaction):
+            return DatabasePool.simple_select_one_onecol_txn(
+                txn=txn,
+                table="email_account_validity",
+                keyvalues={"user_id": user_id},
+                retcol="renewal_token",
+            )
+
+        return await self._api.run_db_interaction(
+            "get_renewal_token_for_user",
+            get_renewal_token_txn,
         )

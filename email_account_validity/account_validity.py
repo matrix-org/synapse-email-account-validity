@@ -28,13 +28,13 @@ logger = logging.getLogger(__name__)
 
 
 class EmailAccountValidity(EmailAccountValidityBase):
-    def __init__(self, config: Any, api: ModuleApi):
+    def __init__(self, config: Any, api: ModuleApi, populate_users: bool = True):
         self._store = EmailAccountValidityStore(config, api)
         self._api = api
 
         super().__init__(config, self._api, self._store)
 
-        run_in_background(self._store.create_and_populate_table)
+        run_in_background(self._store.create_and_populate_table, populate_users)
         self._api.looping_background_call_async(
             self._send_renewal_emails, 30 * 60 * 1000
         )

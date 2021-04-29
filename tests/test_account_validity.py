@@ -101,7 +101,7 @@ class AccountValidityEmailTestCase(aiounittest.AsyncTestCase):
             "address": "izzy@test",
         }]
 
-        async def get_threepids():
+        async def get_threepids(user_id):
             return threepids
 
         module._api.get_threepids_for_user.side_effect = get_threepids

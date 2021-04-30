@@ -66,3 +66,21 @@ This plugin exposes three HTTP routes to manage account validity:
 
 The two first routes need to be reachable by the end users for this feature to work as
 intended.
+
+## Development and Testing
+
+This repository uses `tox` to run tests.
+
+### Tests
+
+This repository uses `unittest` to run the tests located in the `tests`
+directory. They can be ran with `tox -e tests`.
+
+### Making a release
+
+```
+git tag vX.Y
+python3 setup.py sdist
+twine upload dist/synapse-email-account-validity-X.Y.tar.gz
+git push origin vX.Y
+```

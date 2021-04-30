@@ -1,0 +1,21 @@
+name: Tests
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.6", "3.x"]
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install tox
+      - run: tox -e tests

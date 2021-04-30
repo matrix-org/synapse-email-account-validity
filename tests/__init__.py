@@ -104,6 +104,10 @@ async def get_profile_for_user(user_id):
     return ProfileInfo(None, "Izzy")
 
 
+async def send_mail(recipient, subject, html, text):
+    return None
+
+
 async def create_account_validity_module() -> EmailAccountValidity:
     """Starts an EmailAccountValidity module with a basic config and a mock of the
     ModuleApi.
@@ -123,6 +127,7 @@ async def create_account_validity_module() -> EmailAccountValidity:
     module_api.read_templates.side_effect = read_templates
     module_api.current_time_ms.side_effect = current_time_ms
     module_api.get_profile_for_user.side_effect = get_profile_for_user
+    module_api.send_mail.side_effect = send_mail
 
     # Make sure the table is created. Don't try to populate with users since we don't
     # have tables to populate from.

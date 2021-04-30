@@ -95,13 +95,16 @@ class AccountValidityEmailTestCase(aiounittest.AsyncTestCase):
 
         # Set the side effect of get_threepids_for_user so that it returns a threepid on
         # the first call and an empty list on the second call.
-        module._api.get_threepids_for_user.side_effect = [
-            [{
-                "medium": "email",
-                "address": "izzy@test",
-            }],
-            [],
-        ]
+
+        threepids = [{
+            "medium": "email",
+            "address": "izzy@test",
+        }]
+
+        async def get_threepids(user_id):
+            return threepids
+
+        module._api.get_threepids_for_user.side_effect = get_threepids
 
         # Test that trying to send an email to an unknown user doesn't result in an email
         # being sent.
@@ -121,6 +124,7 @@ class AccountValidityEmailTestCase(aiounittest.AsyncTestCase):
 
         # Test that trying to send an email to a known use that has no email address
         # attached to their account results in no email being sent.
+        threepids = []
         await module.send_renewal_email_to_user(user_id)
         self.assertEqual(module._api.send_mail.call_count, 1)
 

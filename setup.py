@@ -48,6 +48,8 @@ setup(
     setup_requires=["setuptools_scm"],
     long_description=read_file(("README.md",)),
     long_description_content_type="text/markdown",
+    url="https://github.com/matrix-org/synapse-email-account-validity",
+    python_requires=">=3.6",
     classifiers=[
         "Development Status :: 4 - Beta",
         "License :: OSI Approved :: Apache Software License",

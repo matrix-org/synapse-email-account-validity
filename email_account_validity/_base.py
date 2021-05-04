@@ -154,7 +154,11 @@ class EmailAccountValidityBase:
                 attempts += 1
         raise StoreError(500, "Couldn't generate a unique string as refresh string.")
 
-    async def renew_account(self, renewal_token: str) -> Tuple[bool, bool, int]:
+    async def renew_account(
+        self,
+        renewal_token: str,
+        user_id: Optional[str] = None,
+    ) -> Tuple[bool, bool, int]:
         """Renews the account attached to a given renewal token by pushing back the
         expiration date by the current validity period in the server's configuration.
 
@@ -164,6 +168,9 @@ class EmailAccountValidityBase:
 
         Args:
             renewal_token: Token sent with the renewal request.
+            user_id: The Matrix ID of the user to renew, if the renewal request was
+                authenticated.
+
         Returns:
             A tuple containing:
               * A bool representing whether the token is valid and unused.
@@ -176,12 +183,13 @@ class EmailAccountValidityBase:
             # was called from a place it shouldn't have been, e.g. the /send_mail servlet.
             raise SynapseError(500, "Tried to renew account in unexpected place")
 
+        # Verify if the token, or the (token, user_id) tuple, exists.
         try:
             (
                 user_id,
                 current_expiration_ts,
                 token_used_ts,
-            ) = await self._store.get_user_from_renewal_token(renewal_token)
+            ) = await self._store.get_user_from_renewal_token(renewal_token, user_id)
         except StoreError:
             return False, False, 0
 

@@ -15,6 +15,7 @@
 
 from twisted.web.resource import Resource
 
+from synapse.api.errors import InvalidClientCredentialsError
 from synapse.config._base import Config, ConfigError
 from synapse.http.server import (
     DirectServeHtmlResource,
@@ -26,6 +27,7 @@ from synapse.module_api.errors import SynapseError
 
 from email_account_validity._base import EmailAccountValidityBase
 from email_account_validity._store import EmailAccountValidityStore
+from email_account_validity._constants import UNAUTHENTICATED_TOKEN_REGEX
 
 
 class EmailAccountValidityServlet(Resource):
@@ -77,11 +79,23 @@ class EmailAccountValidityRenewServlet(
 
         renewal_token = request.args[b"token"][0].decode("utf-8")
 
+        user_id = None
+        if not UNAUTHENTICATED_TOKEN_REGEX.match(renewal_token):
+            # If the token doesn't look like one we might send as a clickable link via
+            # email, try to authenticate the request.
+            try:
+                requester = await self._api.get_user_by_req(request, allow_expired=True)
+            except InvalidClientCredentialsError:
+                respond_with_html(request, 404, self._invalid_token_template.render())
+                return
+
+            user_id = requester.user.to_string()
+
         (
             token_valid,
             token_stale,
             expiration_ts,
-        ) = await self.renew_account(renewal_token)
+        ) = await self.renew_account(renewal_token, user_id)
 
         if token_valid:
             status_code = 200

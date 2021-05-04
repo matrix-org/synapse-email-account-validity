@@ -261,12 +261,14 @@ class EmailAccountValidityStore:
         )
 
     async def get_user_from_renewal_token(
-        self, renewal_token: str
+        self, renewal_token: str, user_id: Optional[str] = None,
     ) -> Tuple[str, int, Optional[int]]:
         """Get a user ID and renewal status from a renewal token.
 
         Args:
             renewal_token: The renewal token to perform the lookup with.
+            user_id: The Matrix ID of the user to renew, if the renewal request was
+                authenticated.
 
         Returns:
             A tuple of containing the following values:
@@ -279,10 +281,14 @@ class EmailAccountValidityStore:
         """
 
         def get_user_from_renewal_token_txn(txn: LoggingTransaction):
+            keyvalues = {"renewal_token": renewal_token}
+            if user_id is not None:
+                keyvalues["user_id"] = user_id
+
             return DatabasePool.simple_select_one_txn(
                 txn=txn,
                 table="email_account_validity",
-                keyvalues={"renewal_token": renewal_token},
+                keyvalues=keyvalues,
                 retcols=["user_id", "expiration_ts_ms", "token_used_ts_ms"],
             )
 

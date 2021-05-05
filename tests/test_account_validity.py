@@ -244,5 +244,5 @@ class AccountValidityEmailTestCase(aiounittest.AsyncTestCase):
         # Check that the renewal token is in the right format. It should be a 8 digit
         # long string.
         token = await module._store.get_renewal_token_for_user(user_id)
-        self.assertTrue(isinstance(token, str))
+        self.assertIsInstance(token, str)
         self.assertTrue(re.compile("^[0-9]{8}$").match(token))

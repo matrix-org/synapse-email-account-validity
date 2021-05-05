@@ -26,6 +26,12 @@ Add the following in your Synapse config under `account_validity`:
       period: 6w
       # How long before an account expires should Synapse send it a renewal email.
       renew_at: 1w
+      # Whether to include a link to click in the emails sent to users. If false, only a
+      # renewal token is sent, in which case it is generated so it's simpler, and the
+      # user will need to copy it into a compatible client that will send an
+      # authenticated request to the server.
+      # Defaults to true.
+      send_link: true
 ```
 
 Also under the HTTP client `listener`, configure an `additional_resource` as per below:
@@ -38,12 +44,50 @@ Also under the HTTP client `listener`, configure an `additional_resource` as per
           # The maximum amount of time an account can stay valid for without being
           # renewed.
           period: 6w
+          # Whether to include a link to click in the emails sent to users. If false,
+          # only a renewal token is sent, in which case it is generated so it's simpler,
+          # and the user will need to copy it into a compatible client that will send an
+          # authenticated request to the server.
+          # Defaults to true.
+          send_link: true
 ```
 
 The syntax for durations is the same as in the rest of Synapse's configuration file.
 
+Configuration parameters with matching names that appear both in `account_validity` and
+`listeners` __must__ have the same value in both places, otherwise the module will not
+behave correctly.
+
+## Templates
+
 If they are not already there, copy the [templates](/email_account_validity/templates)
-into Synapse's templates directory.
+into Synapse's templates directory (or replace them with your own). The templates the
+module will use are:
+
+* `notice_expiry.(html|txt)`: The content of the renewal email. It gets passed the
+  following variables:
+    * `display_name`: The display name of the user needing renewal.
+    * `expiration_ts`: A timestamp in milliseconds representing when the account will
+      expire. Templates can use the `format_ts` (with a date format as the function's
+      parameter) to format this timestamp into a human-readable date.
+    * `url`: The URL the user is supposed to click on to renew their account. If
+      `send_links` is set to `false` in the module's configuration, the value of this
+      variable will be the token the user must copy into their client.
+    * `renewal_token`: The token to use in order to renew the user's account. If
+      `send_links` is set to `false`, templates should prefer this variable to `url`.
+* `account_renewed.html`: The HTML to display to a user when they successfully renew
+  their account. It gets passed the following vaiables:
+    * `expiration_ts`: A timestamp in milliseconds representing when the account will
+      expire. Templates can use the `format_ts` (with a date format as the function's
+      parameter) to format this timestamp into a human-readable date.
+* `account_previously_renewed.html`: The HTML to display to a user when they try to renew
+  their account with a token that's valid but previously used. It gets passed the same
+  variables as `account_renewed.html`.
+* `invalid_token.html`: The HTML to display to a user when they try to renew their account
+  with the wrong token. It doesn't get passed any variable.
+
+Note that the templates directory contains two files that aren't templates (`mail.css`
+and `mail-expiry.css`), but are used by email templates to apply visual adjustments.
 
 ## Routes
 

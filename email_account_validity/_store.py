@@ -18,6 +18,7 @@ import random
 from typing import Dict, List, Optional, Tuple, Union
 
 from synapse.module_api import ModuleApi
+from synapse.module_api.errors import SynapseError
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.util.caches.descriptors import cached
 
@@ -246,8 +247,36 @@ class EmailAccountValidityStore:
         )
         return res
 
-    async def set_renewal_token_for_user(self, user_id: str, renewal_token: str):
+    async def set_renewal_token_for_user(
+        self,
+        user_id: str,
+        renewal_token: str,
+        unique: bool,
+    ):
+        """Store the given renewal token for the given user.
+
+        Args:
+            user_id: The user ID to store the renewal token for.
+            renewal_token: The renewal token to store for the user.
+            unique: Whether the token should be unique across the whole database, i.e.
+                whether it should be able to look the user up from the token.
+
+        Raises:
+            SynapseError(409): unique is set to True and the token is already in use.
+        """
         def set_renewal_token_for_user_txn(txn: LoggingTransaction):
+            if unique:
+                ret = DatabasePool.simple_select_one_onecol_txn(
+                    txn=txn,
+                    table="email_account_validity",
+                    keyvalues={"renewal_token": renewal_token},
+                    retcol="user_id",
+                    allow_none=True,
+                )
+
+                if ret is not None:
+                    raise SynapseError(409, "Renewal token already in use")
+
             DatabasePool.simple_update_one_txn(
                 txn=txn,
                 table="email_account_validity",

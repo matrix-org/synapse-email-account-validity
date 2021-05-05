@@ -132,10 +132,10 @@ class EmailAccountValidityBase:
 
         for address in addresses:
             await self._api.send_mail(
-                address,
-                self._renew_email_subject,
-                html_text,
-                plain_text,
+                recipient=address,
+                subject=self._renew_email_subject,
+                html=html_text,
+                text=plain_text,
             )
 
         await self._store.set_renewal_mail_status(user_id=user_id, email_sent=True)

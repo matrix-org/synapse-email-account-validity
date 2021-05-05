@@ -18,7 +18,7 @@ import re
 import string
 
 
-UNAUTHENTICATED_TOKEN_REGEX = re.compile('[a-zA-Z]{32}')
+UNAUTHENTICATED_TOKEN_REGEX = re.compile('^[a-zA-Z]{32}$')
 
 # We use SystemRandom to make sure we get cryptographically-secure randoms.
 rand = random.SystemRandom()

@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import asyncio
+import re
 import time
 
 # From Python 3.8 onwards, aiounittest.AsyncTestCase can be replaced by
@@ -23,7 +24,7 @@ import aiounittest
 
 from synapse.module_api.errors import SynapseError
 
-from email_account_validity import EmailAccountValidity
+from email_account_validity._utils import UNAUTHENTICATED_TOKEN_REGEX
 from tests import create_account_validity_module
 
 
@@ -122,6 +123,13 @@ class AccountValidityEmailTestCase(aiounittest.AsyncTestCase):
         await module.send_renewal_email_to_user(user_id)
         self.assertEqual(module._api.send_mail.call_count, 1)
 
+        # Test that the email content contains a link; we haven't set send_links in the
+        # module's config so its value should be the default (which is True).
+        kwargs = module._api.send_mail.call_args.kwargs
+        path = "_synapse/client/email_account_validity/renew"
+        self.assertNotEqual(kwargs["html"].find(path), -1)
+        self.assertNotEqual(kwargs["text"].find(path), -1)
+
         # Test that trying to send an email to a known use that has no email address
         # attached to their account results in no email being sent.
         threepids = []
@@ -130,7 +138,7 @@ class AccountValidityEmailTestCase(aiounittest.AsyncTestCase):
 
     async def test_renewal_token(self):
         user_id = "@izzy:test"
-        module = await create_account_validity_module()  # type: EmailAccountValidity
+        module = await create_account_validity_module()
 
         # Insert a row with an expiration timestamp and a renewal token for this user.
         await module._store.set_expiration_date_for_user(user_id)
@@ -144,6 +152,7 @@ class AccountValidityEmailTestCase(aiounittest.AsyncTestCase):
         renewal_token = await module._store.get_renewal_token_for_user(user_id)
         self.assertTrue(isinstance(renewal_token, str))
         self.assertGreater(len(renewal_token), 0)
+        self.assertTrue(UNAUTHENTICATED_TOKEN_REGEX.match(renewal_token))
 
         # Sleep a bit so the new expiration timestamp isn't likely to be equal to the
         # previous one.
@@ -184,3 +193,31 @@ class AccountValidityEmailTestCase(aiounittest.AsyncTestCase):
         self.assertFalse(token_stale)
         self.assertEqual(expiration_ts, 0)
 
+    async def test_send_link_false(self):
+        user_id = "@izzy:test"
+        # Create a module with a configuration forbidding it to send links via email.
+        module = await create_account_validity_module({"send_links": False})
+
+        async def get_threepids(user_id):
+            return [{
+                "medium": "email",
+                "address": "izzy@test",
+            }]
+        module._api.get_threepids_for_user.side_effect = get_threepids
+        await module._store.set_expiration_date_for_user(user_id)
+
+        # Test that, when an email is sent, it doesn't include a link. We do this by
+        # searching the email's content for the path for renewal requests.
+        await module.send_renewal_email_to_user(user_id)
+        self.assertEqual(module._api.send_mail.call_count, 1)
+
+        kwargs = module._api.send_mail.call_args.kwargs
+        path = "_synapse/client/email_account_validity/renew"
+        self.assertEqual(kwargs["html"].find(path), -1)
+        self.assertEqual(kwargs["text"].find(path), -1)
+
+        # Check that the renewal token is in the right format. It should be a 8 digit
+        # long string.
+        token = await module._store.get_renewal_token_for_user(user_id)
+        self.assertTrue(isinstance(token, str))
+        self.assertTrue(re.compile("^[0-9]{8}$").match(token))

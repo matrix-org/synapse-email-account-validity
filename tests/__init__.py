@@ -108,14 +108,13 @@ async def send_mail(recipient, subject, html, text):
     return None
 
 
-async def create_account_validity_module() -> EmailAccountValidity:
+async def create_account_validity_module(config_override={}) -> EmailAccountValidity:
     """Starts an EmailAccountValidity module with a basic config and a mock of the
     ModuleApi.
     """
-    config = {
-        "period": 3628800000,  # 6w
-        "renew_at": 604800000,  # 1w
-    }
+    config = config_override
+    config.setdefault("period", 3628800000)  # 6w
+    config.setdefault("renew_at", 604800000)  # 1w
 
     store = SQLiteStore()
 

@@ -31,7 +31,7 @@ Add the following in your Synapse config under `account_validity`:
       # user will need to copy it into a compatible client that will send an
       # authenticated request to the server.
       # Defaults to true.
-      send_link: true
+      send_links: true
 ```
 
 Also under the HTTP client `listener`, configure an `additional_resource` as per below:
@@ -49,7 +49,7 @@ Also under the HTTP client `listener`, configure an `additional_resource` as per
           # and the user will need to copy it into a compatible client that will send an
           # authenticated request to the server.
           # Defaults to true.
-          send_link: true
+          send_links: true
 ```
 
 The syntax for durations is the same as in the rest of Synapse's configuration file.

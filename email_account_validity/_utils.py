@@ -13,8 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import random
 import re
+import string
 
 
 UNAUTHENTICATED_TOKEN_REGEX = re.compile('[a-zA-Z]{32}')
 
+# We use SystemRandom to make sure we get cryptographically-secure randoms.
+rand = random.SystemRandom()
+
+
+def random_digit_string(length):
+    return "".join(rand.choice(string.digits) for _ in range(length))

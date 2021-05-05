@@ -27,7 +27,7 @@ from synapse.module_api.errors import SynapseError
 
 from email_account_validity._base import EmailAccountValidityBase
 from email_account_validity._store import EmailAccountValidityStore
-from email_account_validity._constants import UNAUTHENTICATED_TOKEN_REGEX
+from email_account_validity._utils import UNAUTHENTICATED_TOKEN_REGEX
 
 
 class EmailAccountValidityServlet(Resource):

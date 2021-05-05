@@ -161,7 +161,9 @@ class EmailAccountValidityBase:
             # string), but also that we don't need to make the token unique across the
             # whole database.
             renewal_token = random_digit_string(8)
-            await self._store.set_renewal_token_for_user(user_id, renewal_token)
+            await self._store.set_renewal_token_for_user(
+                user_id, renewal_token, unique=False,
+            )
             return renewal_token
 
         attempts = 0

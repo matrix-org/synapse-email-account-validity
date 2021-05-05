@@ -125,7 +125,7 @@ class AccountValidityEmailTestCase(aiounittest.AsyncTestCase):
 
         # Test that the email content contains a link; we haven't set send_links in the
         # module's config so its value should be the default (which is True).
-        kwargs = module._api.send_mail.call_args.kwargs
+        _, kwargs = module._api.send_mail.call_args
         path = "_synapse/client/email_account_validity/renew"
         self.assertNotEqual(kwargs["html"].find(path), -1)
         self.assertNotEqual(kwargs["text"].find(path), -1)
@@ -236,7 +236,7 @@ class AccountValidityEmailTestCase(aiounittest.AsyncTestCase):
         await module.send_renewal_email_to_user(user_id)
         self.assertEqual(module._api.send_mail.call_count, 1)
 
-        kwargs = module._api.send_mail.call_args.kwargs
+        _, kwargs = module._api.send_mail.call_args
         path = "_synapse/client/email_account_validity/renew"
         self.assertEqual(kwargs["html"].find(path), -1)
         self.assertEqual(kwargs["text"].find(path), -1)

@@ -84,7 +84,7 @@ class AccountValidityHooksTestCase(aiounittest.AsyncTestCase):
         expiration_ts = await module._store.get_expiration_ts_for_user(user_id)
         now_ms = int(time.time() * 1000)
 
-        self.assertTrue(isinstance(expiration_ts, int))
+        self.assertIsInstance(expiration_ts, int)
         self.assertGreater(expiration_ts, now_ms)
 
 
@@ -135,10 +135,10 @@ class AccountValidityEmailTestCase(aiounittest.AsyncTestCase):
         # Retrieve the expiration timestamp and renewal token and check that they're in
         # the right format.
         old_expiration_ts = await module._store.get_expiration_ts_for_user(user_id)
-        self.assertTrue(isinstance(old_expiration_ts, int))
+        self.assertIsInstance(old_expiration_ts, int)
 
         renewal_token = await module._store.get_renewal_token_for_user(user_id)
-        self.assertTrue(isinstance(renewal_token, str))
+        self.assertIsInstance(renewal_token, str)
         self.assertGreater(len(renewal_token), 0)
 
         # Sleep a bit so the new expiration timestamp isn't likely to be equal to the
@@ -179,4 +179,29 @@ class AccountValidityEmailTestCase(aiounittest.AsyncTestCase):
         self.assertFalse(token_valid)
         self.assertFalse(token_stale)
         self.assertEqual(expiration_ts, 0)
+
+    async def test_duplicate_token(self):
+        user_id_1 = "@izzy1:test"
+        user_id_2 = "@izzy2:test"
+        token = "sometoken"
+
+        module = await create_account_validity_module()
+
+        # Insert both users in the table.
+        await module._store.set_expiration_date_for_user(user_id_1)
+        await module._store.set_expiration_date_for_user(user_id_2)
+
+        # Set the renewal token.
+        await module._store.set_renewal_token_for_user(user_id_1, token, True)
+
+        # Try to set the same renewal token for another user.
+        exception = None
+        try:
+            await module._store.set_renewal_token_for_user(user_id_2, token, True)
+        except SynapseError as e:
+            exception = e
+
+        # Check that an exception was raised and that it's the one we're expecting.
+        self.assertIsInstance(exception, SynapseError)
+        self.assertEqual(exception.code, 409)
 

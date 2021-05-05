@@ -18,9 +18,9 @@ from typing import Any, Optional, Tuple
 
 from twisted.web.server import Request
 
-from synapse.api.errors import StoreError, SynapseError
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.module_api import ModuleApi
+from synapse.module_api.errors import SynapseError
 from synapse.types import UserID
 from synapse.util import stringutils
 
@@ -102,7 +102,7 @@ class EmailAccountValidityBase:
             display_name = profile.display_name
             if display_name is None:
                 display_name = user_id
-        except StoreError:
+        except SynapseError:
             display_name = user_id
 
         renewal_token = await self.generate_renewal_token(user_id)
@@ -142,17 +142,19 @@ class EmailAccountValidityBase:
             The generated string.
 
         Raises:
-            StoreError(500): Couldn't generate a unique string after 5 attempts.
+            SynapseError(500): Couldn't generate a unique string after 5 attempts.
         """
         attempts = 0
         while attempts < 5:
             try:
                 renewal_token = stringutils.random_string(32)
-                await self._store.set_renewal_token_for_user(user_id, renewal_token)
+                await self._store.set_renewal_token_for_user(
+                    user_id, renewal_token, unique=True,
+                )
                 return renewal_token
-            except StoreError:
+            except SynapseError:
                 attempts += 1
-        raise StoreError(500, "Couldn't generate a unique string as refresh string.")
+        raise SynapseError(500, "Couldn't generate a unique string as refresh string.")
 
     async def renew_account(self, renewal_token: str) -> Tuple[bool, bool, int]:
         """Renews the account attached to a given renewal token by pushing back the
@@ -182,7 +184,7 @@ class EmailAccountValidityBase:
                 current_expiration_ts,
                 token_used_ts,
             ) = await self._store.get_user_from_renewal_token(renewal_token)
-        except StoreError:
+        except SynapseError:
             return False, False, 0
 
         # Check whether this token has already been used.

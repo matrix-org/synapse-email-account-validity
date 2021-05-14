@@ -17,10 +17,8 @@ import logging
 import random
 from typing import Dict, List, Optional, Tuple, Union
 
-from synapse.module_api import ModuleApi
+from synapse.module_api import DatabasePool, LoggingTransaction, ModuleApi, cached
 from synapse.module_api.errors import SynapseError
-from synapse.storage.database import DatabasePool, LoggingTransaction
-from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
 

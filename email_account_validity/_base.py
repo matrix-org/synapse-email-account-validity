@@ -14,18 +14,16 @@
 # limitations under the License.
 
 import logging
+import time
 from typing import Any, Optional, Tuple
 
 from twisted.web.server import Request
 
-from synapse.http.servlet import parse_json_object_from_request
-from synapse.module_api import ModuleApi
+from synapse.module_api import ModuleApi, parse_json_object_from_request, UserID
 from synapse.module_api.errors import SynapseError
-from synapse.types import UserID
-from synapse.util import stringutils
 
 from email_account_validity._store import EmailAccountValidityStore
-from email_account_validity._utils import random_digit_string
+from email_account_validity._utils import random_digit_string, random_string
 
 logger = logging.getLogger(__name__)
 
@@ -169,7 +167,7 @@ class EmailAccountValidityBase:
         attempts = 0
         while attempts < 5:
             try:
-                renewal_token = stringutils.random_string(32)
+                renewal_token = random_string(32)
                 await self._store.set_renewal_token_for_user(
                     user_id, renewal_token, unique=True,
                 )
@@ -262,7 +260,7 @@ class EmailAccountValidityBase:
             New expiration date for this account, as a timestamp in
             milliseconds since epoch.
         """
-        now = self._api.current_time_ms()
+        now = int(time.time() * 1000)
         if expiration_ts is None:
             expiration_ts = now + self._period
 

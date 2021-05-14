@@ -14,15 +14,17 @@
 # limitations under the License.
 
 import logging
+import time
 from typing import Any, Tuple
 
 from twisted.web.server import Request
 
-from synapse.config._base import Config, ConfigError
+from synapse.config._base import ConfigError
 from synapse.module_api import ModuleApi, run_in_background
 
 from email_account_validity._base import EmailAccountValidityBase
 from email_account_validity._store import EmailAccountValidityStore
+from email_account_validity._utils import parse_duration
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +56,8 @@ class EmailAccountValidity(EmailAccountValidityBase):
                 "'renew_at' is required when using email account validity"
             )
 
-        config["period"] = Config.parse_duration(config.get("period") or 0)
-        config["renew_at"] = Config.parse_duration(config.get("renew_at") or 0)
+        config["period"] = parse_duration(config.get("period") or 0)
+        config["renew_at"] = parse_duration(config.get("renew_at") or 0)
         return config
 
     async def on_legacy_renew(self, renewal_token: str) -> Tuple[bool, bool, int]:
@@ -111,7 +113,7 @@ class EmailAccountValidity(EmailAccountValidityBase):
         if expiration_ts is None:
             return False, False
 
-        now_ts = self._api.current_time_ms()
+        now_ts = int(time.time() * 1000)
         return now_ts >= expiration_ts, True
 
     async def on_user_registration(self, user_id: str):

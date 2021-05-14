@@ -15,19 +15,21 @@
 
 from twisted.web.resource import Resource
 
-from synapse.api.errors import InvalidClientCredentialsError
-from synapse.config._base import Config, ConfigError
-from synapse.http.server import (
+from synapse.module_api import (
     DirectServeHtmlResource,
     DirectServeJsonResource,
+    ModuleApi,
     respond_with_html,
 )
-from synapse.module_api import ModuleApi
-from synapse.module_api.errors import SynapseError
+from synapse.module_api.errors import (
+    ConfigError,
+    InvalidClientCredentialsError,
+    SynapseError,
+)
 
 from email_account_validity._base import EmailAccountValidityBase
 from email_account_validity._store import EmailAccountValidityStore
-from email_account_validity._utils import UNAUTHENTICATED_TOKEN_REGEX
+from email_account_validity._utils import UNAUTHENTICATED_TOKEN_REGEX, parse_duration
 
 
 class EmailAccountValidityServlet(Resource):
@@ -39,7 +41,7 @@ class EmailAccountValidityServlet(Resource):
 
     @staticmethod
     def parse_config(config: dict) -> dict:
-        config["period"] = Config.parse_duration(config.get("period") or 0)
+        config["period"] = parse_duration(config.get("period") or 0)
         return config
 
 
@@ -54,7 +56,7 @@ class EmailAccountValidityRenewServlet(
         DirectServeHtmlResource.__init__(self)
 
         if "period" in config:
-            self._period = Config.parse_duration(config["period"])
+            self._period = parse_duration(config["period"])
         else:
             raise ConfigError("'period' is required when using account validity")
 

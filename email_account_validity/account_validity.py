@@ -106,7 +106,7 @@ class EmailAccountValidity(EmailAccountValidityBase):
         """
         return await self.set_account_validity_from_request(request)
 
-    async def user_expired(self, user_id: str) -> Tuple[bool, bool]:
+    async def is_user_expired(self, user_id: str) -> Tuple[bool, bool]:
         """Checks whether a user is expired.
 
         Args:

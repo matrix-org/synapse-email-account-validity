@@ -15,7 +15,6 @@
 
 from collections import namedtuple
 import sqlite3
-import pkg_resources
 import time
 from unittest import mock
 

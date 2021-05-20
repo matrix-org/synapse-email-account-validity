@@ -25,7 +25,11 @@ from synapse.module_api.errors import SynapseError
 
 from email_account_validity import _global
 from email_account_validity._store import EmailAccountValidityStore
-from email_account_validity._utils import random_digit_string, random_string
+from email_account_validity._utils import (
+    random_digit_string,
+    random_string,
+    UNAUTHENTICATED_TOKEN_REGEX,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +118,14 @@ class EmailAccountValidityBase:
         except SynapseError:
             display_name = user_id
 
-        renewal_token = await self.generate_renewal_token(user_id)
+        # If the user isn't expected to click on a link, but instead to copy the token
+        # into their client, we generate a different kind of token, simpler and shorter,
+        # because a) we don't need it to be unique to the whole table and b) we want the
+        # user to be able to be easily type it back into their client.
+        if self._send_links:
+            renewal_token = await self.generate_unauthenticated_renewal_token(user_id)
+        else:
+            renewal_token = await self.generate_authenticated_renewal_token(user_id)
 
         if self._send_links:
             url = "%s_synapse/client/email_account_validity/renew?token=%s" % (
@@ -122,12 +133,10 @@ class EmailAccountValidityBase:
                 renewal_token,
             )
         else:
-            # If we're not supposed to send a URL, fallback to the URL being just the
-            # token. Templates should be using the `renewal_token` variable, but we do
-            # this so old templates don't break.
-            url = renewal_token
+            url = None
 
         template_vars = {
+            "app_name": self._api.email_app_name,
             "display_name": display_name,
             "expiration_ts": expiration_ts,
             "url": url,
@@ -147,9 +156,11 @@ class EmailAccountValidityBase:
 
         await self._store.set_renewal_mail_status(user_id=user_id, email_sent=True)
 
-    async def generate_renewal_token(self, user_id: str) -> str:
-        """Generates a random string that will be inserted into the user's renewal email,
-        then saves it into the database.
+    async def generate_authenticated_renewal_token(self, user_id: str) -> str:
+        """Generates a 8-digit long random string then saves it into the database.
+
+        This token is to be sent to the user over email so that the user can copy it into
+        their client to renew their account.
 
         Args:
             user_id: ID of the user to generate a string for.
@@ -160,19 +171,27 @@ class EmailAccountValidityBase:
         Raises:
             SynapseError(500): Couldn't generate a unique string after 5 attempts.
         """
-        if not self._send_links:
-            # If the user isn't expected to click on a link, they're expected to enter a
-            # token manually into their client, which in turn sends the renewal request
-            # to the server, authenticated with an access token. This means that in this
-            # case we need the token to be shorter and less complex (hence the 8 digits
-            # string), but also that we don't need to make the token unique across the
-            # whole database.
-            renewal_token = random_digit_string(8)
-            await self._store.set_renewal_token_for_user(
-                user_id, renewal_token, unique=False,
-            )
-            return renewal_token
+        renewal_token = random_digit_string(8)
+        await self._store.set_renewal_token_for_user(
+            user_id, renewal_token, unique=False,
+        )
+        return renewal_token
 
+    async def generate_unauthenticated_renewal_token(self, user_id: str) -> str:
+        """Generates a 32-letter long random string then saves it into the database.
+
+        This token is to be sent to the user over email in a link that the user will then
+        click to renew their account.
+
+        Args:
+            user_id: ID of the user to generate a string for.
+
+        Returns:
+            The generated string.
+
+        Raises:
+            SynapseError(500): Couldn't generate a unique string after 5 attempts.
+        """
         attempts = 0
         while attempts < 5:
             try:
@@ -209,10 +228,10 @@ class EmailAccountValidityBase:
               * An int representing the user's expiry timestamp as milliseconds since the
                 epoch, or 0 if the token was invalid.
         """
-        if self._period is None:
-            # If a period hasn't been provided in the config, then it means this function
-            # was called from a place it shouldn't have been, e.g. the /send_mail servlet.
-            raise SynapseError(500, "Tried to renew account in unexpected place")
+        # If we were not able to authenticate the user requesting a renewal, and the
+        # token needs authentication, consider the token neither valid nor stale.
+        if user_id is None and not UNAUTHENTICATED_TOKEN_REGEX.match(renewal_token):
+            return False, False, 0
 
         # Verify if the token, or the (token, user_id) tuple, exists.
         try:
@@ -220,7 +239,7 @@ class EmailAccountValidityBase:
                 user_id,
                 current_expiration_ts,
                 token_used_ts,
-            ) = await self._store.get_user_from_renewal_token(renewal_token, user_id)
+            ) = await self._store.validate_renewal_token(renewal_token, user_id)
         except SynapseError:
             return False, False, 0
 

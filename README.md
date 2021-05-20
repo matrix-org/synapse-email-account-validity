@@ -41,16 +41,6 @@ Also under the HTTP client `listener`, configure an `additional_resource` as per
     additional_resources:
       "/_synapse/client/email_account_validity":
         module: email_account_validity.EmailAccountValidityServlet
-        config:
-          # The maximum amount of time an account can stay valid for without being
-          # renewed.
-          period: 6w
-          # Whether to include a link to click in the emails sent to users. If false,
-          # only a renewal token is sent, in which case it is generated so it's simpler,
-          # and the user will need to copy it into a compatible client that will send an
-          # authenticated request to the server.
-          # Defaults to true.
-          send_links: true
 ```
 
 The syntax for durations is the same as in the rest of Synapse's configuration file.
@@ -65,13 +55,15 @@ The templates the module will use are:
 
 * `notice_expiry.(html|txt)`: The content of the renewal email. It gets passed the
   following variables:
+    * `app_name`: The value configured for `app_name` in the Synapse configuration file
+      (under the `email` section).
     * `display_name`: The display name of the user needing renewal.
     * `expiration_ts`: A timestamp in milliseconds representing when the account will
       expire. Templates can use the `format_ts` (with a date format as the function's
       parameter) to format this timestamp into a human-readable date.
     * `url`: The URL the user is supposed to click on to renew their account. If
       `send_links` is set to `false` in the module's configuration, the value of this
-      variable will be the token the user must copy into their client.
+      variable will be `None`.
     * `renewal_token`: The token to use in order to renew the user's account. If
       `send_links` is set to `false`, templates should prefer this variable to `url`.
 * `account_renewed.html`: The HTML to display to a user when they successfully renew

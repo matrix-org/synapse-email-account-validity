@@ -30,12 +30,10 @@ from synapse.module_api.errors import (
 
 from email_account_validity._base import EmailAccountValidityBase
 from email_account_validity._store import EmailAccountValidityStore
-from email_account_validity._utils import UNAUTHENTICATED_TOKEN_REGEX, parse_duration
 
 
 class EmailAccountValidityServlet(Resource):
     def __init__(self, config: dict, api: ModuleApi):
-        print("-----------------------------SERVLET-----------------------------")
         super().__init__()
         self.putChild(b'renew', EmailAccountValidityRenewServlet(api))
         self.putChild(b'send_mail', EmailAccountValiditySendMailServlet(api))
@@ -78,17 +76,11 @@ class EmailAccountValidityRenewServlet(
 
         renewal_token = request.args[b"token"][0].decode("utf-8")
 
-        user_id = None
-        if not UNAUTHENTICATED_TOKEN_REGEX.match(renewal_token):
-            # If the token doesn't look like one we might send as a clickable link via
-            # email, try to authenticate the request.
-            try:
-                requester = await self._api.get_user_by_req(request, allow_expired=True)
-            except InvalidClientCredentialsError:
-                respond_with_html(request, 404, self._invalid_token_template.render())
-                return
-
+        try:
+            requester = await self._api.get_user_by_req(request, allow_expired=True)
             user_id = requester.user.to_string()
+        except InvalidClientCredentialsError:
+            user_id = None
 
         (
             token_valid,
@@ -107,7 +99,7 @@ class EmailAccountValidityRenewServlet(
                 expiration_ts=expiration_ts
             )
         else:
-            status_code = 404
+            status_code = 400
             response = self._invalid_token_template.render()
 
         respond_with_html(request, status_code, response)

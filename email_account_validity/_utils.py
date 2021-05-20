@@ -13,24 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import random
 import re
+import secrets
 import string
 from typing import Union
 
 
 UNAUTHENTICATED_TOKEN_REGEX = re.compile('^[a-zA-Z]{32}$')
 
-# We use SystemRandom to make sure we get cryptographically-secure randoms.
-rand = random.SystemRandom()
-
 
 def random_string(length: int) -> str:
-    return "".join(rand.choice(string.ascii_letters) for _ in range(length))
+    return "".join(secrets.choice(string.ascii_letters) for _ in range(length))
 
 
 def random_digit_string(length):
-    return "".join(rand.choice(string.digits) for _ in range(length))
+    return "".join(secrets.choice(string.digits) for _ in range(length))
 
 
 def parse_duration(value: Union[str, int]) -> int:

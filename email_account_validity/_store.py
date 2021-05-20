@@ -291,10 +291,12 @@ class EmailAccountValidityStore:
             set_renewal_token_for_user_txn,
         )
 
-    async def get_user_from_renewal_token(
+    async def validate_renewal_token(
         self, renewal_token: str, user_id: Optional[str] = None,
     ) -> Tuple[str, int, Optional[int]]:
-        """Get a user ID and renewal status from a renewal token.
+        """Check if the provided renewal token is associating with a user, optionally
+        validating the user it belongs to as well, and return the account renewal status
+        of the user it belongs to.
 
         Args:
             renewal_token: The renewal token to perform the lookup with.
@@ -309,6 +311,10 @@ class EmailAccountValidityStore:
                 * An optional int representing the timestamp of when the user renewed
                     their account timestamp as milliseconds since the epoch. None if the
                     account has not been renewed using the current token yet.
+
+        Raises:
+            SynapseError(404): The token could not be found (or does not belong to the
+                provided user, if any).
         """
 
         def get_user_from_renewal_token_txn(txn: LoggingTransaction):

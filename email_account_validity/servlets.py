@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
 
 from twisted.web.resource import Resource
 
@@ -34,31 +35,26 @@ from email_account_validity._utils import UNAUTHENTICATED_TOKEN_REGEX, parse_dur
 
 class EmailAccountValidityServlet(Resource):
     def __init__(self, config: dict, api: ModuleApi):
+        print("-----------------------------SERVLET-----------------------------")
         super().__init__()
-        self.putChild(b'renew', EmailAccountValidityRenewServlet(config, api))
-        self.putChild(b'send_mail', EmailAccountValiditySendMailServlet(config, api))
-        self.putChild(b'admin', EmailAccountValidityAdminServlet(config, api))
+        self.putChild(b'renew', EmailAccountValidityRenewServlet(api))
+        self.putChild(b'send_mail', EmailAccountValiditySendMailServlet(api))
+        self.putChild(b'admin', EmailAccountValidityAdminServlet(api))
 
     @staticmethod
     def parse_config(config: dict) -> dict:
-        config["period"] = parse_duration(config.get("period") or 0)
         return config
 
 
 class EmailAccountValidityRenewServlet(
     EmailAccountValidityBase, DirectServeHtmlResource
 ):
-    def __init__(self, config: dict, api: ModuleApi):
+    def __init__(self, api: ModuleApi):
         self._api = api
-        self._store = EmailAccountValidityStore(config, api)
+        self._store = EmailAccountValidityStore(api)
 
-        EmailAccountValidityBase.__init__(self, config, self._api, self._store)
+        EmailAccountValidityBase.__init__(self, {}, self._api, self._store)
         DirectServeHtmlResource.__init__(self)
-
-        if "period" in config:
-            self._period = parse_duration(config["period"])
-        else:
-            raise ConfigError("'period' is required when using account validity")
 
         (
             self._account_renewed_template,
@@ -69,7 +65,8 @@ class EmailAccountValidityRenewServlet(
                 "account_renewed.html",
                 "account_previously_renewed.html",
                 "invalid_token.html",
-            ]
+            ],
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates"),
         )
 
     async def _async_render_GET(self, request):
@@ -120,10 +117,10 @@ class EmailAccountValiditySendMailServlet(
     EmailAccountValidityBase,
     DirectServeJsonResource,
 ):
-    def __init__(self, config: dict, api: ModuleApi):
-        store = EmailAccountValidityStore(config, api)
+    def __init__(self, api: ModuleApi):
+        store = EmailAccountValidityStore(api)
 
-        EmailAccountValidityBase.__init__(self, config, api, store)
+        EmailAccountValidityBase.__init__(self, {}, api, store)
         DirectServeJsonResource.__init__(self)
 
         if not api.public_baseurl:
@@ -144,10 +141,10 @@ class EmailAccountValidityAdminServlet(
     EmailAccountValidityBase,
     DirectServeJsonResource,
 ):
-    def __init__(self, config: dict, api: ModuleApi):
-        store = EmailAccountValidityStore(config, api)
+    def __init__(self, api: ModuleApi):
+        store = EmailAccountValidityStore(api)
 
-        EmailAccountValidityBase.__init__(self, config, api, store)
+        EmailAccountValidityBase.__init__(self, {}, api, store)
         DirectServeJsonResource.__init__(self)
 
     async def _async_render_POST(self, request):

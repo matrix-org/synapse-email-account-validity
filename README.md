@@ -17,9 +17,10 @@ pip install synapse-email-account-validity
 
 ## Config
 
-Add the following in your Synapse config under `account_validity`:
+Add the following in your Synapse config:
 
 ```yaml
+account_validity_modules:
   - module: email_account_validity.EmailAccountValidity
     config:
       # The maximum amount of time an account can stay valid for without being renewed.
@@ -60,9 +61,7 @@ behave correctly.
 
 ## Templates
 
-If they are not already there, copy the [templates](/email_account_validity/templates)
-into Synapse's templates directory (or replace them with your own). The templates the
-module will use are:
+The templates the module will use are:
 
 * `notice_expiry.(html|txt)`: The content of the renewal email. It gets passed the
   following variables:
@@ -85,6 +84,8 @@ module will use are:
   variables as `account_renewed.html`.
 * `invalid_token.html`: The HTML to display to a user when they try to renew their account
   with the wrong token. It doesn't get passed any variable.
+
+You can find and change the default templates [here](https://github.com/matrix-org/synapse-email-account-validity/tree/main/email_account_validity/templates).
 
 Note that the templates directory contains two files that aren't templates (`mail.css`
 and `mail-expiry.css`), but are used by email templates to apply visual adjustments.

@@ -22,6 +22,7 @@ from twisted.web.server import Request
 from synapse.config._base import ConfigError
 from synapse.module_api import ModuleApi, run_in_background
 
+from email_account_validity import _global
 from email_account_validity._base import EmailAccountValidityBase
 from email_account_validity._store import EmailAccountValidityStore
 from email_account_validity._utils import parse_duration
@@ -31,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 class EmailAccountValidity(EmailAccountValidityBase):
     def __init__(self, config: Any, api: ModuleApi, populate_users: bool = True):
-        self._store = EmailAccountValidityStore(config, api)
+        self._store = EmailAccountValidityStore(api)
         self._api = api
 
         super().__init__(config, self._api, self._store)
@@ -58,6 +59,14 @@ class EmailAccountValidity(EmailAccountValidityBase):
 
         config["period"] = parse_duration(config.get("period") or 0)
         config["renew_at"] = parse_duration(config.get("renew_at") or 0)
+
+        _global.config = _global.EmailAccountValidityConfig(
+            config["period"],
+            config["renew_at"],
+            config.get("renewal_email_subject", "Renew your %(app)s account"),
+            config.get("send_links", True)
+        )
+
         return config
 
     async def on_legacy_renew(self, renewal_token: str) -> Tuple[bool, bool, int]:

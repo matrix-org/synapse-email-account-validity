@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+import os
 import time
 from typing import Any, Optional, Tuple
 
@@ -22,6 +23,7 @@ from twisted.web.server import Request
 from synapse.module_api import ModuleApi, parse_json_object_from_request, UserID
 from synapse.module_api.errors import SynapseError
 
+from email_account_validity import _global
 from email_account_validity._store import EmailAccountValidityStore
 from email_account_validity._utils import random_digit_string, random_string
 
@@ -33,24 +35,31 @@ class EmailAccountValidityBase:
         self._api = api
         self._store = store
 
-        self._period = config.get("period")
-        self._send_links = config.get("send_links", True)
+        if _global.config is None:
+            self._period = config.get("period")
+            self._send_links = config.get("send_links", True)
 
-        (self._template_html, self._template_text,) = api.read_templates(
-            ["notice_expiry.html", "notice_expiry.txt"],
-        )
-
-        if "renew_email_subject" in config:
-            renew_email_subject = config["renew_email_subject"]
+            if "renew_email_subject" in config:
+                renew_email_subject = config["renew_email_subject"]
+            else:
+                renew_email_subject = "Renew your %(app)s account"
         else:
-            renew_email_subject = "Renew your %(app)s account"
+            self._period = _global.config.period
+            self._send_links = _global.config.send_links
+
+            renew_email_subject = _global.config.renew_email_subject
 
         try:
             app_name = self._api.email_app_name
             self._renew_email_subject = renew_email_subject % {"app": app_name}
-        except Exception:
+        except (KeyError, TypeError):
             # If substitution failed, fall back to the bare strings.
             self._renew_email_subject = renew_email_subject
+
+        (self._template_html, self._template_text,) = api.read_templates(
+            ["notice_expiry.html", "notice_expiry.txt"],
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates"),
+        )
 
     async def send_renewal_email_to_user(self, user_id: str) -> None:
         """

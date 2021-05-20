@@ -15,19 +15,22 @@
 
 import logging
 import random
+import time
 from typing import Dict, List, Optional, Tuple, Union
 
 from synapse.module_api import DatabasePool, LoggingTransaction, ModuleApi, cached
 from synapse.module_api.errors import SynapseError
 
+from email_account_validity import _global
+
 logger = logging.getLogger(__name__)
 
 
 class EmailAccountValidityStore:
-    def __init__(self, config: dict, api: ModuleApi):
+    def __init__(self, api: ModuleApi):
         self._api = api
-        self._period = config.get("period", 0)
-        self._renew_at = config.get("renew_at")
+        self._period = _global.config.period
+        self._renew_at = _global.config.renew_at
         self._expiration_ts_max_delta = self._period * 10.0 / 100.0
         self._rand = random.SystemRandom()
 
@@ -98,7 +101,8 @@ class EmailAccountValidityStore:
             # state includes an expiration timestamp close to now + validity period, but
             # is slightly randomised to avoid sending huge bursts of renewal emails at
             # once.
-            default_expiration_ts = self._api.current_time_ms() + self._period
+            now_ms = int(time.time() * 1000)
+            default_expiration_ts = now_ms + self._period
             for user in missing_users:
                 if users_to_insert.get(user["name"]) is None:
                     users_to_insert[user["name"]] = {
@@ -149,8 +153,9 @@ class EmailAccountValidityStore:
             A list of dictionaries, each with a user ID and expiration time (in
             milliseconds).
         """
+        def select_users_txn(txn, renew_at):
+            now_ms = int(time.time() * 1000)
 
-        def select_users_txn(txn, now_ms, renew_at):
             txn.execute(
                 """
                 SELECT user_id, expiration_ts_ms FROM email_account_validity
@@ -163,7 +168,6 @@ class EmailAccountValidityStore:
         return await self._api.run_db_interaction(
             "get_users_expiring_soon",
             select_users_txn,
-            self._api.current_time_ms(),
             self._renew_at,
         )
 
@@ -348,7 +352,7 @@ class EmailAccountValidityStore:
         Args:
             user_id: User ID to set an expiration date for.
         """
-        now_ms = self._api.current_time_ms()
+        now_ms = int(time.time() * 1000)
         expiration_ts = now_ms + self._period
 
         sql = """

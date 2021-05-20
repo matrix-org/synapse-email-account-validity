@@ -69,13 +69,11 @@ class CursorWrapper:
         return self.cur.__next__()
 
 
-def read_templates(filenames):
+def read_templates(filenames, directory):
     """Reads Jinja templates from the templates directory. This function is mostly copied
     from Synapse.
     """
-    loader = jinja2.FileSystemLoader(
-        pkg_resources.resource_filename("email_account_validity", "templates")
-    )
+    loader = jinja2.FileSystemLoader(directory)
     env = jinja2.Environment(
         loader=loader,
         autoescape=jinja2.select_autoescape(),
@@ -107,8 +105,8 @@ async def create_account_validity_module(config_override={}) -> EmailAccountVali
     ModuleApi.
     """
     config = config_override
-    config.setdefault("period", 3628800000)  # 6w
-    config.setdefault("renew_at", 604800000)  # 1w
+    config.setdefault("period", "6w")
+    config.setdefault("renew_at", "1w")
 
     store = SQLiteStore()
 
@@ -123,6 +121,7 @@ async def create_account_validity_module(config_override={}) -> EmailAccountVali
 
     # Make sure the table is created. Don't try to populate with users since we don't
     # have tables to populate from.
+    config = EmailAccountValidity.parse_config(config)
     module = EmailAccountValidity(config, module_api, populate_users=False)
     await module._store.create_and_populate_table(populate_users=False)
 

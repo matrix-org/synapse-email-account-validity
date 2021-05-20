@@ -39,7 +39,7 @@ class AccountValidityHooksTestCase(aiounittest.AsyncTestCase):
 
         # Test that, if the user isn't known, the module says it can't determine whether
         # they've expired.
-        expired, success = await module.user_expired(user_id=user_id)
+        expired, success = await module.is_user_expired(user_id=user_id)
 
         self.assertFalse(expired)
         self.assertFalse(success)
@@ -51,7 +51,7 @@ class AccountValidityHooksTestCase(aiounittest.AsyncTestCase):
             expiration_ts=one_hour_ahead,
         )
 
-        expired, success = await module.user_expired(user_id=user_id)
+        expired, success = await module.is_user_expired(user_id=user_id)
         self.assertFalse(expired)
         self.assertTrue(success)
 
@@ -62,7 +62,7 @@ class AccountValidityHooksTestCase(aiounittest.AsyncTestCase):
             expiration_ts=one_hour_ago,
         )
 
-        expired, success = await module.user_expired(user_id=user_id)
+        expired, success = await module.is_user_expired(user_id=user_id)
         self.assertTrue(expired)
         self.assertTrue(success)
 
@@ -142,7 +142,7 @@ class AccountValidityEmailTestCase(aiounittest.AsyncTestCase):
 
         # Insert a row with an expiration timestamp and a renewal token for this user.
         await module._store.set_expiration_date_for_user(user_id)
-        await module.generate_renewal_token(user_id)
+        await module.generate_unauthenticated_renewal_token(user_id)
 
         # Retrieve the expiration timestamp and renewal token and check that they're in
         # the right format.

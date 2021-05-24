@@ -15,7 +15,7 @@
 
 import logging
 import time
-from typing import Any, Tuple
+from typing import Any, Tuple, Optional
 
 from twisted.web.server import Request
 
@@ -106,7 +106,7 @@ class EmailAccountValidity(EmailAccountValidityBase):
         """
         return await self.set_account_validity_from_request(request)
 
-    async def is_user_expired(self, user_id: str) -> Tuple[bool, bool]:
+    async def is_user_expired(self, user_id: str) -> Optional[bool]:
         """Checks whether a user is expired.
 
         Args:
@@ -120,10 +120,10 @@ class EmailAccountValidity(EmailAccountValidityBase):
         """
         expiration_ts = await self._store.get_expiration_ts_for_user(user_id)
         if expiration_ts is None:
-            return False, False
+            return None
 
         now_ts = int(time.time() * 1000)
-        return now_ts >= expiration_ts, True
+        return now_ts >= expiration_ts
 
     async def on_user_registration(self, user_id: str):
         """Set the expiration timestamp for a newly registered user.

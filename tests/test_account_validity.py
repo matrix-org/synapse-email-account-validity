@@ -39,10 +39,9 @@ class AccountValidityHooksTestCase(aiounittest.AsyncTestCase):
 
         # Test that, if the user isn't known, the module says it can't determine whether
         # they've expired.
-        expired, success = await module.is_user_expired(user_id=user_id)
+        expired = await module.is_user_expired(user_id=user_id)
 
-        self.assertFalse(expired)
-        self.assertFalse(success)
+        self.assertIsNone(expired)
 
         # Test that, if the user has an expiration timestamp that's ahead of now, the
         # module says it can determine that they haven't expired.
@@ -51,9 +50,8 @@ class AccountValidityHooksTestCase(aiounittest.AsyncTestCase):
             expiration_ts=one_hour_ahead,
         )
 
-        expired, success = await module.is_user_expired(user_id=user_id)
+        expired = await module.is_user_expired(user_id=user_id)
         self.assertFalse(expired)
-        self.assertTrue(success)
 
         # Test that, if the user has an expiration timestamp that's passed, the module
         # says it can determine that they have expired.
@@ -62,9 +60,8 @@ class AccountValidityHooksTestCase(aiounittest.AsyncTestCase):
             expiration_ts=one_hour_ago,
         )
 
-        expired, success = await module.is_user_expired(user_id=user_id)
+        expired = await module.is_user_expired(user_id=user_id)
         self.assertTrue(expired)
-        self.assertTrue(success)
 
     async def test_on_user_registration(self):
         user_id = "@izzy:test"

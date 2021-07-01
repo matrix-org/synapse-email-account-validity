@@ -23,7 +23,6 @@ from twisted.web.server import Request
 from synapse.module_api import ModuleApi, parse_json_object_from_request, UserID
 from synapse.module_api.errors import SynapseError
 
-from email_account_validity import _global
 from email_account_validity._store import EmailAccountValidityStore
 from email_account_validity._utils import (
     random_digit_string,
@@ -35,23 +34,17 @@ logger = logging.getLogger(__name__)
 
 
 class EmailAccountValidityBase:
-    def __init__(self, config: Any, api: ModuleApi, store: EmailAccountValidityStore):
+    def __init__(self, config: dict, api: ModuleApi):
         self._api = api
-        self._store = store
+        self._store = EmailAccountValidityStore(config, api)
 
-        if _global.config is None:
-            self._period = config.get("period")
-            self._send_links = config.get("send_links", True)
+        self._period = config.get("period")
+        self._send_links = config.get("send_links", True)
 
-            if "renew_email_subject" in config:
-                renew_email_subject = config["renew_email_subject"]
-            else:
-                renew_email_subject = "Renew your %(app)s account"
+        if "renew_email_subject" in config:
+            renew_email_subject = config["renew_email_subject"]
         else:
-            self._period = _global.config.period
-            self._send_links = _global.config.send_links
-
-            renew_email_subject = _global.config.renew_email_subject
+            renew_email_subject = "Renew your %(app)s account"
 
         try:
             app_name = self._api.email_app_name

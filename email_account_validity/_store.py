@@ -21,16 +21,14 @@ from typing import Dict, List, Optional, Tuple, Union
 from synapse.module_api import DatabasePool, LoggingTransaction, ModuleApi, cached
 from synapse.module_api.errors import SynapseError
 
-from email_account_validity import _global
-
 logger = logging.getLogger(__name__)
 
 
 class EmailAccountValidityStore:
-    def __init__(self, api: ModuleApi):
+    def __init__(self, config: dict, api: ModuleApi):
         self._api = api
-        self._period = _global.config.period
-        self._renew_at = _global.config.renew_at
+        self._period = config.get("period")
+        self._renew_at = config.get("renew_at")
         self._expiration_ts_max_delta = self._period * 10.0 / 100.0
         self._rand = random.SystemRandom()
 

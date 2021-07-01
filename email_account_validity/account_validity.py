@@ -22,8 +22,12 @@ from twisted.web.server import Request
 from synapse.config._base import ConfigError
 from synapse.module_api import ModuleApi, run_in_background
 
-from email_account_validity import _global
 from email_account_validity._base import EmailAccountValidityBase
+from email_account_validity._servlets import (
+    EmailAccountValidityRenewServlet,
+    EmailAccountValiditySendMailServlet,
+    EmailAccountValidityAdminServlet,
+)
 from email_account_validity._store import EmailAccountValidityStore
 from email_account_validity._utils import parse_duration
 
@@ -32,10 +36,10 @@ logger = logging.getLogger(__name__)
 
 class EmailAccountValidity(EmailAccountValidityBase):
     def __init__(self, config: Any, api: ModuleApi, populate_users: bool = True):
-        self._store = EmailAccountValidityStore(api)
+        self._store = EmailAccountValidityStore(config, api)
         self._api = api
 
-        super().__init__(config, self._api, self._store)
+        super().__init__(config, self._api)
 
         run_in_background(self._store.create_and_populate_table, populate_users)
         self._api.looping_background_call_async(
@@ -44,6 +48,29 @@ class EmailAccountValidity(EmailAccountValidityBase):
 
         if not api.public_baseurl:
             raise ConfigError("Can't send renewal emails without 'public_baseurl'")
+
+        self._api.register_account_validity_callbacks(
+            is_user_expired=self.is_user_expired,
+            on_user_registration=self.on_user_registration,
+            on_legacy_send_mail=self.on_legacy_send_mail,
+            on_legacy_renew=self.on_legacy_renew,
+            on_legacy_admin_request=self.on_legacy_admin_request,
+        )
+
+        self._api.register_web_resource(
+            path="/_synapse/client/email_account_validity/renew",
+            resource=EmailAccountValidityRenewServlet(config, self._api, self._store)
+        )
+
+        self._api.register_web_resource(
+            path="/_synapse/client/email_account_validity/send_mail",
+            resource=EmailAccountValiditySendMailServlet(config, self._api, self._store)
+        )
+
+        self._api.register_web_resource(
+            path="/_synapse/client/email_account_validity/admin",
+            resource=EmailAccountValidityAdminServlet(config, self._api, self._store)
+        )
 
     @staticmethod
     def parse_config(config: dict):
@@ -59,13 +86,6 @@ class EmailAccountValidity(EmailAccountValidityBase):
 
         config["period"] = parse_duration(config.get("period") or 0)
         config["renew_at"] = parse_duration(config.get("renew_at") or 0)
-
-        _global.config = _global.EmailAccountValidityConfig(
-            config["period"],
-            config["renew_at"],
-            config.get("renewal_email_subject", "Renew your %(app)s account"),
-            config.get("send_links", True)
-        )
 
         return config
 

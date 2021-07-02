@@ -202,12 +202,12 @@ class AccountValidityEmailTestCase(aiounittest.AsyncTestCase):
         await module._store.set_expiration_date_for_user(user_id_2)
 
         # Set the renewal token.
-        await module._store.set_renewal_token_for_user(user_id_1, token, True)
+        await module._store.set_renewal_token_for_user(user_id_1, token)
 
         # Try to set the same renewal token for another user.
         exception = None
         try:
-            await module._store.set_renewal_token_for_user(user_id_2, token, True)
+            await module._store.set_renewal_token_for_user(user_id_2, token)
         except SynapseError as e:
             exception = e
 

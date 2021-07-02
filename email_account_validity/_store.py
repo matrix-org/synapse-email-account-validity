@@ -19,6 +19,7 @@ import time
 from typing import Dict, List, Optional, Tuple, Union
 
 from synapse.module_api import DatabasePool, LoggingTransaction, ModuleApi, cached
+from synapse.module_api.errors import SynapseError
 
 logger = logging.getLogger(__name__)
 
@@ -57,13 +58,23 @@ class EmailAccountValidityStore:
                     long_renewal_token TEXT,
                     short_renewal_token TEXT,
                     token_used_ts_ms BIGINT
-                );
+                )
+                """,
+                (),
+            )
 
+            txn.execute(
+                """
                 CREATE UNIQUE INDEX IF NOT EXISTS long_renewal_token_idx
-                    ON email_account_validity(long_renewal_token);
+                    ON email_account_validity(long_renewal_token)
+                """,
+                (),
+            )
 
+            txn.execute(
+                """
                 CREATE UNIQUE INDEX IF NOT EXISTS short_renewal_token_idx
-                    ON email_account_validity(short_renewal_token, user_id);
+                    ON email_account_validity(short_renewal_token, user_id)
                 """,
                 (),
             )
@@ -277,15 +288,18 @@ class EmailAccountValidityStore:
         def set_renewal_token_for_user_txn(txn: LoggingTransaction):
             # We don't need to check if the token is unique since we've got unique
             # indexes to check that.
-            DatabasePool.simple_update_one_txn(
-                txn=txn,
-                table="email_account_validity",
-                keyvalues={"user_id": user_id},
-                updatevalues={
-                    self._token_column_name: renewal_token,
-                    "token_used_ts_ms": None,
-                },
-            )
+            try:
+                DatabasePool.simple_update_one_txn(
+                    txn=txn,
+                    table="email_account_validity",
+                    keyvalues={"user_id": user_id},
+                    updatevalues={
+                        self._token_column_name: renewal_token,
+                        "token_used_ts_ms": None,
+                    },
+                )
+            except Exception:
+                raise SynapseError(409, "Renewal token already in use")
 
         await self._api.run_db_interaction(
             "set_renewal_token_for_user",

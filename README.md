@@ -4,7 +4,7 @@ A Synapse plugin module to manage account validity using validation emails.
 
 This module requires:
 
-* Synapse >= 1.34.0
+* Synapse >= 1.38.0
 * sqlite3 >= 3.24.0 (if using SQLite with Synapse)
 
 ## Installation
@@ -20,7 +20,7 @@ pip install synapse-email-account-validity
 Add the following in your Synapse config:
 
 ```yaml
-account_validity_modules:
+modules:
   - module: email_account_validity.EmailAccountValidity
     config:
       # The maximum amount of time an account can stay valid for without being renewed.
@@ -33,14 +33,6 @@ account_validity_modules:
       # authenticated request to the server.
       # Defaults to true.
       send_links: true
-```
-
-Also under the HTTP client `listener`, configure an `additional_resource` as per below:
-
-```yaml
-    additional_resources:
-      "/_synapse/client/email_account_validity":
-        module: email_account_validity.EmailAccountValidityServlet
 ```
 
 The syntax for durations is the same as in the rest of Synapse's configuration file.

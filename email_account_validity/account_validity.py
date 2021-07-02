@@ -42,7 +42,7 @@ class EmailAccountValidity(EmailAccountValidityBase):
         super().__init__(config, self._api)
 
         run_in_background(self._store.create_and_populate_table, populate_users)
-        self._api.looping_background_call_async(
+        self._api.looping_background_call(
             self._send_renewal_emails, 30 * 60 * 1000
         )
 

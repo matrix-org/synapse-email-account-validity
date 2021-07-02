@@ -19,9 +19,11 @@ import time
 from typing import Dict, List, Optional, Tuple, Union
 
 from synapse.module_api import DatabasePool, LoggingTransaction, ModuleApi, cached
-from synapse.module_api.errors import SynapseError
 
 logger = logging.getLogger(__name__)
+
+_LONG_TOKEN_COLUMN_NAME = "long_renewal_token"
+_SHORT_TOKEN_COLUMN_NAME = "short_renewal_token"
 
 
 class EmailAccountValidityStore:
@@ -31,6 +33,13 @@ class EmailAccountValidityStore:
         self._renew_at = config.get("renew_at")
         self._expiration_ts_max_delta = self._period * 10.0 / 100.0
         self._rand = random.SystemRandom()
+
+        use_long_tokens = config.get("send_links", True)
+        self._token_column_name = (
+            _LONG_TOKEN_COLUMN_NAME
+            if use_long_tokens
+            else _SHORT_TOKEN_COLUMN_NAME
+        )
 
     async def create_and_populate_table(self, populate_users: bool = True):
         """Create the email_account_validity table and populate it from other tables from
@@ -45,9 +54,16 @@ class EmailAccountValidityStore:
                     user_id TEXT PRIMARY KEY,
                     expiration_ts_ms BIGINT NOT NULL,
                     email_sent BOOLEAN NOT NULL,
-                    renewal_token TEXT,
+                    long_renewal_token TEXT,
+                    short_renewal_token TEXT,
                     token_used_ts_ms BIGINT
-                )
+                );
+
+                CREATE UNIQUE INDEX IF NOT EXISTS long_renewal_token_idx
+                    ON email_account_validity(long_renewal_token);
+
+                CREATE UNIQUE INDEX IF NOT EXISTS short_renewal_token_idx
+                    ON email_account_validity(short_renewal_token, user_id);
                 """,
                 (),
             )
@@ -200,7 +216,7 @@ class EmailAccountValidityStore:
                     user_id,
                     expiration_ts_ms,
                     email_sent,
-                    renewal_token,
+                    %(token_column_name)s,
                     token_used_ts_ms
                 )
                 VALUES (?, ?, ?, ?, ?)
@@ -208,9 +224,9 @@ class EmailAccountValidityStore:
                 SET
                     expiration_ts_ms = EXCLUDED.expiration_ts_ms,
                     email_sent = EXCLUDED.email_sent,
-                    renewal_token = EXCLUDED.renewal_token,
+                    %(token_column_name)s = EXCLUDED.%(token_column_name)s,
                     token_used_ts_ms = EXCLUDED.token_used_ts_ms
-                """,
+                """ % {"token_column_name": self._token_column_name},
                 (user_id, expiration_ts, email_sent, renewal_token, token_used_ts)
             )
 
@@ -251,37 +267,24 @@ class EmailAccountValidityStore:
         self,
         user_id: str,
         renewal_token: str,
-        unique: bool,
     ):
         """Store the given renewal token for the given user.
 
         Args:
             user_id: The user ID to store the renewal token for.
             renewal_token: The renewal token to store for the user.
-            unique: Whether the token should be unique across the whole database, i.e.
-                whether it should be able to look the user up from the token.
-
-        Raises:
-            SynapseError(409): unique is set to True and the token is already in use.
         """
         def set_renewal_token_for_user_txn(txn: LoggingTransaction):
-            if unique:
-                ret = DatabasePool.simple_select_one_onecol_txn(
-                    txn=txn,
-                    table="email_account_validity",
-                    keyvalues={"renewal_token": renewal_token},
-                    retcol="user_id",
-                    allow_none=True,
-                )
-
-                if ret is not None:
-                    raise SynapseError(409, "Renewal token already in use")
-
+            # We don't need to check if the token is unique since we've got unique
+            # indexes to check that.
             DatabasePool.simple_update_one_txn(
                 txn=txn,
                 table="email_account_validity",
                 keyvalues={"user_id": user_id},
-                updatevalues={"renewal_token": renewal_token, "token_used_ts_ms": None},
+                updatevalues={
+                    self._token_column_name: renewal_token,
+                    "token_used_ts_ms": None,
+                },
             )
 
         await self._api.run_db_interaction(
@@ -316,7 +319,7 @@ class EmailAccountValidityStore:
         """
 
         def get_user_from_renewal_token_txn(txn: LoggingTransaction):
-            keyvalues = {"renewal_token": renewal_token}
+            keyvalues = {self._token_column_name: renewal_token}
             if user_id is not None:
                 keyvalues["user_id"] = user_id
 
@@ -410,7 +413,7 @@ class EmailAccountValidityStore:
                 txn=txn,
                 table="email_account_validity",
                 keyvalues={"user_id": user_id},
-                retcol="renewal_token",
+                retcol=self._token_column_name,
             )
 
         return await self._api.run_db_interaction(

@@ -165,9 +165,7 @@ class EmailAccountValidityBase:
             SynapseError(500): Couldn't generate a unique string after 5 attempts.
         """
         renewal_token = random_digit_string(8)
-        await self._store.set_renewal_token_for_user(
-            user_id, renewal_token, unique=False,
-        )
+        await self._store.set_renewal_token_for_user(user_id, renewal_token)
         return renewal_token
 
     async def generate_unauthenticated_renewal_token(self, user_id: str) -> str:
@@ -189,9 +187,7 @@ class EmailAccountValidityBase:
         while attempts < 5:
             try:
                 renewal_token = random_string(32)
-                await self._store.set_renewal_token_for_user(
-                    user_id, renewal_token, unique=True,
-                )
+                await self._store.set_renewal_token_for_user(user_id, renewal_token)
                 return renewal_token
             except SynapseError:
                 attempts += 1

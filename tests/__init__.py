@@ -93,12 +93,6 @@ def read_templates(filenames):
     return [env.get_template(filename) for filename in filenames]
 
 
-def current_time_ms():
-    """Returns the current time in milliseconds.
-    """
-    return int(time.time() * 1000)
-
-
 async def get_profile_for_user(user_id):
     ProfileInfo = namedtuple("ProfileInfo", ("avatar_url", "display_name"))
     return ProfileInfo(None, "Izzy")
@@ -125,7 +119,6 @@ async def create_account_validity_module() -> EmailAccountValidity:
     module_api = mock.Mock(spec=ModuleApi)
     module_api.run_db_interaction.side_effect = store.run_db_interaction
     module_api.read_templates.side_effect = read_templates
-    module_api.current_time_ms.side_effect = current_time_ms
     module_api.get_profile_for_user.side_effect = get_profile_for_user
     module_api.send_mail.side_effect = send_mail
 

@@ -16,11 +16,11 @@
 import logging
 import os
 import time
-from typing import Any, Optional, Tuple
+from typing import Optional, Tuple
 
 from twisted.web.server import Request
 
-from synapse.module_api import ModuleApi, parse_json_object_from_request, UserID
+from synapse.module_api import ModuleApi, UserID, parse_json_object_from_request
 from synapse.module_api.errors import SynapseError
 
 from email_account_validity._store import EmailAccountValidityStore
@@ -34,9 +34,11 @@ logger = logging.getLogger(__name__)
 
 
 class EmailAccountValidityBase:
-    def __init__(self, config: dict, api: ModuleApi):
+    def __init__(self, config: dict, api: ModuleApi, store: EmailAccountValidityStore):
         self._api = api
-        self._store = EmailAccountValidityStore(config, api)
+        self._store = store
+
+        self._period = config["period"]
 
         self._period = config.get("period")
         self._send_links = config.get("send_links", True)

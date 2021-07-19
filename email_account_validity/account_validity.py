@@ -15,18 +15,18 @@
 
 import logging
 import time
-from typing import Any, Tuple, Optional
+from typing import Tuple, Optional
 
 from twisted.web.server import Request
 
-from synapse.config._base import ConfigError
 from synapse.module_api import ModuleApi, run_in_background
+from synapse.module_api.errors import ConfigError
 
 from email_account_validity._base import EmailAccountValidityBase
 from email_account_validity._servlets import (
+    EmailAccountValidityAdminServlet,
     EmailAccountValidityRenewServlet,
     EmailAccountValiditySendMailServlet,
-    EmailAccountValidityAdminServlet,
 )
 from email_account_validity._store import EmailAccountValidityStore
 from email_account_validity._utils import parse_duration
@@ -35,19 +35,16 @@ logger = logging.getLogger(__name__)
 
 
 class EmailAccountValidity(EmailAccountValidityBase):
-    def __init__(self, config: Any, api: ModuleApi, populate_users: bool = True):
+    def __init__(self, config: dict, api: ModuleApi, populate_users: bool = True):
         self._store = EmailAccountValidityStore(config, api)
         self._api = api
 
-        super().__init__(config, self._api)
+        super().__init__(config, self._api, self._store)
 
         run_in_background(self._store.create_and_populate_table, populate_users)
         self._api.looping_background_call(
             self._send_renewal_emails, 30 * 60 * 1000
         )
-
-        if not api.public_baseurl:
-            raise ConfigError("Can't send renewal emails without 'public_baseurl'")
 
         self._api.register_account_validity_callbacks(
             is_user_expired=self.is_user_expired,
@@ -72,6 +69,9 @@ class EmailAccountValidity(EmailAccountValidityBase):
             resource=EmailAccountValidityAdminServlet(config, self._api, self._store)
         )
 
+        if not api.public_baseurl:
+            raise ConfigError("Can't send renewal emails without 'public_baseurl'")
+
     @staticmethod
     def parse_config(config: dict):
         """Check that the configuration includes the required keys and parse the values
@@ -84,9 +84,8 @@ class EmailAccountValidity(EmailAccountValidityBase):
                 "'renew_at' is required when using email account validity"
             )
 
-        config["period"] = parse_duration(config.get("period") or 0)
-        config["renew_at"] = parse_duration(config.get("renew_at") or 0)
-
+        config["period"] = parse_duration(config["period"])
+        config["renew_at"] = parse_duration(config["renew_at"])
         return config
 
     async def on_legacy_renew(self, renewal_token: str) -> Tuple[bool, bool, int]:

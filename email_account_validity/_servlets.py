@@ -14,8 +14,6 @@
 # limitations under the License.
 import os
 
-from twisted.web.resource import Resource
-
 from synapse.module_api import (
     DirectServeHtmlResource,
     DirectServeJsonResource,
@@ -32,26 +30,13 @@ from email_account_validity._base import EmailAccountValidityBase
 from email_account_validity._store import EmailAccountValidityStore
 
 
-class EmailAccountValidityServlet(Resource):
-    def __init__(self, config: dict, api: ModuleApi):
-        super().__init__()
-        self.putChild(b'renew', EmailAccountValidityRenewServlet(api))
-        self.putChild(b'send_mail', EmailAccountValiditySendMailServlet(api))
-        self.putChild(b'admin', EmailAccountValidityAdminServlet(api))
-
-    @staticmethod
-    def parse_config(config: dict) -> dict:
-        return config
-
-
 class EmailAccountValidityRenewServlet(
     EmailAccountValidityBase, DirectServeHtmlResource
 ):
     def __init__(self, config: dict, api: ModuleApi, store: EmailAccountValidityStore):
         self._api = api
-        self._store = store
 
-        EmailAccountValidityBase.__init__(self, config, self._api)
+        EmailAccountValidityBase.__init__(self, config, self._api, store)
         DirectServeHtmlResource.__init__(self)
 
         (
@@ -110,7 +95,7 @@ class EmailAccountValiditySendMailServlet(
     DirectServeJsonResource,
 ):
     def __init__(self, config: dict, api: ModuleApi, store: EmailAccountValidityStore):
-        EmailAccountValidityBase.__init__(self, config, api)
+        EmailAccountValidityBase.__init__(self, config, api, store)
         DirectServeJsonResource.__init__(self)
 
         self._store = store
@@ -134,7 +119,7 @@ class EmailAccountValidityAdminServlet(
     DirectServeJsonResource,
 ):
     def __init__(self, config: dict, api: ModuleApi, store: EmailAccountValidityStore):
-        EmailAccountValidityBase.__init__(self, config, api)
+        EmailAccountValidityBase.__init__(self, config, api, store)
         DirectServeJsonResource.__init__(self)
 
         self._store = store

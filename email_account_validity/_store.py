@@ -30,8 +30,8 @@ _SHORT_TOKEN_COLUMN_NAME = "short_renewal_token"
 class EmailAccountValidityStore:
     def __init__(self, config: dict, api: ModuleApi):
         self._api = api
-        self._period = config.get("period")
-        self._renew_at = config.get("renew_at")
+        self._period = config["period"]
+        self._renew_at = config["renew_at"]
         self._expiration_ts_max_delta = self._period * 10.0 / 100.0
         self._rand = random.SystemRandom()
 
@@ -193,6 +193,7 @@ class EmailAccountValidityStore:
         return await self._api.run_db_interaction(
             "get_users_expiring_soon",
             select_users_txn,
+            int(time.time() * 1000),
             self._renew_at,
         )
 

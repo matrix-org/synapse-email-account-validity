@@ -22,10 +22,6 @@ from typing import Union
 UNAUTHENTICATED_TOKEN_REGEX = re.compile('^[a-zA-Z]{32}$')
 
 
-def random_string(length: int) -> str:
-    return "".join(secrets.choice(string.ascii_letters) for _ in range(length))
-
-
 def random_digit_string(length):
     return "".join(secrets.choice(string.digits) for _ in range(length))
 
@@ -59,3 +55,11 @@ def parse_duration(value: Union[str, int]) -> int:
         value = value[:-1]
         size = sizes[suffix]
     return int(value) * size
+
+
+def random_string(length: int) -> str:
+    """Generate a cryptographically secure string of random letters.
+
+    Drawn from the characters: `a-z` and `A-Z`
+    """
+    return "".join(secrets.choice(string.ascii_letters) for _ in range(length))

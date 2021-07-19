@@ -16,7 +16,6 @@
 from pkg_resources import DistributionNotFound, get_distribution
 
 from email_account_validity.account_validity import EmailAccountValidity
-from email_account_validity.servlets import EmailAccountValidityServlet
 
 try:
     __version__ = get_distribution(__name__).version
@@ -24,4 +23,4 @@ except DistributionNotFound:
     # package is not installed
     pass
 
-__all__ = ["EmailAccountValidity", "EmailAccountValidityServlet"]
+__all__ = ["EmailAccountValidity"]

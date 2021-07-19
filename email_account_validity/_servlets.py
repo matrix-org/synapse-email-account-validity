@@ -13,48 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.web.resource import Resource
-
-from synapse.config._base import Config, ConfigError
-from synapse.http.server import (
+from synapse.module_api import (
     DirectServeHtmlResource,
     DirectServeJsonResource,
+    ModuleApi,
     respond_with_html,
 )
-from synapse.module_api import ModuleApi
-from synapse.module_api.errors import SynapseError
+from synapse.module_api.errors import ConfigError, SynapseError
 
 from email_account_validity._base import EmailAccountValidityBase
 from email_account_validity._store import EmailAccountValidityStore
 
 
-class EmailAccountValidityServlet(Resource):
-    def __init__(self, config: dict, api: ModuleApi):
-        super().__init__()
-        self.putChild(b'renew', EmailAccountValidityRenewServlet(config, api))
-        self.putChild(b'send_mail', EmailAccountValiditySendMailServlet(config, api))
-        self.putChild(b'admin', EmailAccountValidityAdminServlet(config, api))
-
-    @staticmethod
-    def parse_config(config: dict) -> dict:
-        config["period"] = Config.parse_duration(config.get("period") or 0)
-        return config
-
-
 class EmailAccountValidityRenewServlet(
     EmailAccountValidityBase, DirectServeHtmlResource
 ):
-    def __init__(self, config: dict, api: ModuleApi):
+    def __init__(self, config: dict, api: ModuleApi, store: EmailAccountValidityStore):
         self._api = api
-        self._store = EmailAccountValidityStore(config, api)
 
-        EmailAccountValidityBase.__init__(self, config, self._api, self._store)
+        EmailAccountValidityBase.__init__(self, config, self._api, store)
         DirectServeHtmlResource.__init__(self)
-
-        if "period" in config:
-            self._period = Config.parse_duration(config["period"])
-        else:
-            raise ConfigError("'period' is required when using account validity")
 
         (
             self._account_renewed_template,
@@ -104,9 +82,7 @@ class EmailAccountValiditySendMailServlet(
     EmailAccountValidityBase,
     DirectServeJsonResource,
 ):
-    def __init__(self, config: dict, api: ModuleApi):
-        store = EmailAccountValidityStore(config, api)
-
+    def __init__(self, config: dict, api: ModuleApi, store: EmailAccountValidityStore):
         EmailAccountValidityBase.__init__(self, config, api, store)
         DirectServeJsonResource.__init__(self)
 
@@ -128,9 +104,7 @@ class EmailAccountValidityAdminServlet(
     EmailAccountValidityBase,
     DirectServeJsonResource,
 ):
-    def __init__(self, config: dict, api: ModuleApi):
-        store = EmailAccountValidityStore(config, api)
-
+    def __init__(self, config: dict, api: ModuleApi, store: EmailAccountValidityStore):
         EmailAccountValidityBase.__init__(self, config, api, store)
         DirectServeJsonResource.__init__(self)
 

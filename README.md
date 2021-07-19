@@ -4,7 +4,7 @@ A Synapse plugin module to manage account validity using validation emails.
 
 This module requires:
 
-* Synapse >= 1.38.0
+* Synapse >= 1.39.0
 * sqlite3 >= 3.24.0 (if using SQLite with Synapse)
 
 ## Installation

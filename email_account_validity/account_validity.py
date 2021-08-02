@@ -23,6 +23,7 @@ from synapse.module_api import ModuleApi, run_in_background
 from synapse.module_api.errors import ConfigError
 
 from email_account_validity._base import EmailAccountValidityBase
+from email_account_validity._config import EmailAccountValidityConfig
 from email_account_validity._servlets import (
     EmailAccountValidityAdminServlet,
     EmailAccountValidityRenewServlet,
@@ -35,7 +36,12 @@ logger = logging.getLogger(__name__)
 
 
 class EmailAccountValidity(EmailAccountValidityBase):
-    def __init__(self, config: dict, api: ModuleApi, populate_users: bool = True):
+    def __init__(
+        self,
+        config: EmailAccountValidityConfig,
+        api: ModuleApi,
+        populate_users: bool = True,
+    ):
         self._store = EmailAccountValidityStore(config, api)
         self._api = api
 
@@ -84,9 +90,12 @@ class EmailAccountValidity(EmailAccountValidityBase):
                 "'renew_at' is required when using email account validity"
             )
 
-        config["period"] = parse_duration(config["period"])
-        config["renew_at"] = parse_duration(config["renew_at"])
-        return config
+        parsed_config = EmailAccountValidityConfig(
+            period=parse_duration(config["period"]),
+            renew_at=parse_duration(config["renew_at"]),
+            renew_email_subject=config.get("renew_email_subject"),
+        )
+        return parsed_config
 
     async def on_legacy_renew(self, renewal_token: str) -> Tuple[bool, bool, int]:
         """Attempt to renew an account and return the results of this attempt to the

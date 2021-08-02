@@ -22,16 +22,20 @@ from synapse.module_api import (
 from synapse.module_api.errors import ConfigError, SynapseError
 
 from email_account_validity._base import EmailAccountValidityBase
+from email_account_validity._config import EmailAccountValidityConfig
 from email_account_validity._store import EmailAccountValidityStore
 
 
 class EmailAccountValidityRenewServlet(
     EmailAccountValidityBase, DirectServeHtmlResource
 ):
-    def __init__(self, config: dict, api: ModuleApi, store: EmailAccountValidityStore):
-        self._api = api
-
-        EmailAccountValidityBase.__init__(self, config, self._api, store)
+    def __init__(
+        self,
+        config: EmailAccountValidityConfig,
+        api: ModuleApi,
+        store: EmailAccountValidityStore,
+    ):
+        EmailAccountValidityBase.__init__(self, config, api, store)
         DirectServeHtmlResource.__init__(self)
 
         (
@@ -82,7 +86,12 @@ class EmailAccountValiditySendMailServlet(
     EmailAccountValidityBase,
     DirectServeJsonResource,
 ):
-    def __init__(self, config: dict, api: ModuleApi, store: EmailAccountValidityStore):
+    def __init__(
+        self,
+        config: EmailAccountValidityConfig,
+        api: ModuleApi,
+        store: EmailAccountValidityStore,
+    ):
         EmailAccountValidityBase.__init__(self, config, api, store)
         DirectServeJsonResource.__init__(self)
 
@@ -104,7 +113,12 @@ class EmailAccountValidityAdminServlet(
     EmailAccountValidityBase,
     DirectServeJsonResource,
 ):
-    def __init__(self, config: dict, api: ModuleApi, store: EmailAccountValidityStore):
+    def __init__(
+        self,
+        config: EmailAccountValidityConfig,
+        api: ModuleApi,
+        store: EmailAccountValidityStore,
+    ):
         EmailAccountValidityBase.__init__(self, config, api, store)
         DirectServeJsonResource.__init__(self)
 

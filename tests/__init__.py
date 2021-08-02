@@ -23,6 +23,7 @@ import jinja2
 from synapse.module_api import ModuleApi
 
 from email_account_validity import EmailAccountValidity
+from email_account_validity._config import EmailAccountValidityConfig
 
 
 class SQLiteStore:
@@ -106,10 +107,10 @@ async def create_account_validity_module() -> EmailAccountValidity:
     """Starts an EmailAccountValidity module with a basic config and a mock of the
     ModuleApi.
     """
-    config = {
-        "period": 3628800000,  # 6w
-        "renew_at": 604800000,  # 1w
-    }
+    config = EmailAccountValidityConfig(
+        period=3628800000,
+        renew_at=604800000,
+    )
 
     store = SQLiteStore()
 

@@ -15,13 +15,14 @@
 
 import logging
 import time
-from typing import Any, Optional, Tuple
+from typing import Optional, Tuple
 
 from twisted.web.server import Request
 
 from synapse.module_api import ModuleApi, UserID, parse_json_object_from_request
 from synapse.module_api.errors import SynapseError
 
+from email_account_validity._config import EmailAccountValidityConfig
 from email_account_validity._store import EmailAccountValidityStore
 from email_account_validity._utils import random_string
 
@@ -29,18 +30,23 @@ logger = logging.getLogger(__name__)
 
 
 class EmailAccountValidityBase:
-    def __init__(self, config: Any, api: ModuleApi, store: EmailAccountValidityStore):
+    def __init__(
+        self,
+        config: EmailAccountValidityConfig,
+        api: ModuleApi,
+        store: EmailAccountValidityStore,
+    ):
         self._api = api
         self._store = store
 
-        self._period = config["period"]
+        self._period = config.period
 
         (self._template_html, self._template_text,) = api.read_templates(
             ["notice_expiry.html", "notice_expiry.txt"],
         )
 
-        if "renew_email_subject" in config:
-            renew_email_subject = config["renew_email_subject"]
+        if config.renew_email_subject is not None:
+            renew_email_subject = config.renew_email_subject
         else:
             renew_email_subject = "Renew your %(app)s account"
 

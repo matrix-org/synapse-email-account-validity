@@ -141,10 +141,8 @@ class EmailAccountValidity(EmailAccountValidityBase):
             user_id: The user to check the expiration state for.
 
         Returns:
-            * A boolean indicating whether the user is expired.
-            * A boolean indicating whether it was possible to determine whether the user
-              is expired. Will be False if no expiration timestamp is associated with the
-              user.
+            A boolean indicating if the user has expired, or None if the module could not
+            figure it out (i.e. if the user has no expiration timestamp).
         """
         expiration_ts = await self._store.get_expiration_ts_for_user(user_id)
         if expiration_ts is None:

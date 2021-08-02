@@ -147,7 +147,7 @@ class EmailAccountValidityBase:
             The generated string.
 
         Raises:
-            StoreError(500): Couldn't generate a unique string after 5 attempts.
+            SynapseError(500): Couldn't generate a unique string after 5 attempts.
         """
         attempts = 0
         while attempts < 5:

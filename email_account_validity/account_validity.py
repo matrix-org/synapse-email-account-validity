@@ -24,11 +24,7 @@ from synapse.module_api.errors import ConfigError
 
 from email_account_validity._base import EmailAccountValidityBase
 from email_account_validity._config import EmailAccountValidityConfig
-from email_account_validity._servlets import (
-    EmailAccountValidityAdminServlet,
-    EmailAccountValidityRenewServlet,
-    EmailAccountValiditySendMailServlet,
-)
+from email_account_validity._servlets import EmailAccountValidityServlet
 from email_account_validity._store import EmailAccountValidityStore
 from email_account_validity._utils import parse_duration
 
@@ -42,6 +38,9 @@ class EmailAccountValidity(EmailAccountValidityBase):
         api: ModuleApi,
         populate_users: bool = True,
     ):
+        if not api.public_baseurl:
+            raise ConfigError("Can't send renewal emails without 'public_baseurl'")
+
         self._store = EmailAccountValidityStore(config, api)
         self._api = api
 
@@ -61,22 +60,9 @@ class EmailAccountValidity(EmailAccountValidityBase):
         )
 
         self._api.register_web_resource(
-            path="/_synapse/client/email_account_validity/renew",
-            resource=EmailAccountValidityRenewServlet(config, self._api, self._store)
+            path="/_synapse/client/email_account_validity",
+            resource=EmailAccountValidityServlet(config, self._api, self._store)
         )
-
-        self._api.register_web_resource(
-            path="/_synapse/client/email_account_validity/send_mail",
-            resource=EmailAccountValiditySendMailServlet(config, self._api, self._store)
-        )
-
-        self._api.register_web_resource(
-            path="/_synapse/client/email_account_validity/admin",
-            resource=EmailAccountValidityAdminServlet(config, self._api, self._store)
-        )
-
-        if not api.public_baseurl:
-            raise ConfigError("Can't send renewal emails without 'public_baseurl'")
 
     @staticmethod
     def parse_config(config: dict):

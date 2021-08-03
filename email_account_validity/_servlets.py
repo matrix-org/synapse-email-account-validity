@@ -20,10 +20,27 @@ from synapse.module_api import (
     respond_with_html,
 )
 from synapse.module_api.errors import ConfigError, SynapseError
+from twisted.web.resource import Resource
 
 from email_account_validity._base import EmailAccountValidityBase
 from email_account_validity._config import EmailAccountValidityConfig
 from email_account_validity._store import EmailAccountValidityStore
+
+
+class EmailAccountValidityServlet(Resource):
+    def __init__(
+        self,
+        config: EmailAccountValidityConfig,
+        api: ModuleApi,
+        store: EmailAccountValidityStore,
+    ):
+        super().__init__()
+        self.putChild(b'renew', EmailAccountValidityRenewServlet(config, api, store))
+        self.putChild(
+            b'send_mail',
+            EmailAccountValiditySendMailServlet(config, api, store),
+        )
+        self.putChild(b'admin', EmailAccountValidityAdminServlet(config, api, store))
 
 
 class EmailAccountValidityRenewServlet(

@@ -17,7 +17,7 @@ from typing import Optional
 import attr
 
 
-@attr.s(frozen=true, auto_attribs=True)
+@attr.s(frozen=True, auto_attribs=True)
 class EmailAccountValidityConfig:
     period: int
     renew_at: int

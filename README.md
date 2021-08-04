@@ -62,7 +62,7 @@ The templates the module will use are:
 You can find and change the default templates [here](https://github.com/matrix-org/synapse-email-account-validity/tree/main/email_account_validity/templates).
 Admins can install custom templates either by changing the default ones directly, or by
 configuring Synapse with a custom template directory that contains the custom templates.
-
+Admins that don't need to customise their templates can just use the module as is and ignore this paragraph.
 Note that the templates directory contains two files that aren't templates (`mail.css`
 and `mail-expiry.css`), but are used by email templates to apply visual adjustments.
 

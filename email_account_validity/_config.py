@@ -17,8 +17,8 @@ from typing import Optional
 import attr
 
 
-@attr.s(frozen=true)
+@attr.s(frozen=true, auto_attribs=True)
 class EmailAccountValidityConfig:
-    period = attr.ib(type=int)
-    renew_at = attr.ib(type=int)
-    renew_email_subject = attr.ib(type=Optional[str], default=None)
+    period: int
+    renew_at: int
+    renew_email_subject: Optional[str] = None

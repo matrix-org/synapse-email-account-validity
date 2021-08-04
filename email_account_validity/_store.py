@@ -15,20 +15,21 @@
 
 import logging
 import random
+import time
 from typing import Dict, List, Optional, Tuple, Union
 
-from synapse.module_api import ModuleApi
-from synapse.storage.database import DatabasePool, LoggingTransaction
-from synapse.util.caches.descriptors import cached
+from synapse.module_api import DatabasePool, LoggingTransaction, ModuleApi, cached
+
+from email_account_validity._config import EmailAccountValidityConfig
 
 logger = logging.getLogger(__name__)
 
 
 class EmailAccountValidityStore:
-    def __init__(self, config: dict, api: ModuleApi):
+    def __init__(self, config: EmailAccountValidityConfig, api: ModuleApi):
         self._api = api
-        self._period = config.get("period", 0)
-        self._renew_at = config.get("renew_at")
+        self._period = config.period
+        self._renew_at = config.renew_at
         self._expiration_ts_max_delta = self._period * 10.0 / 100.0
         self._rand = random.SystemRandom()
 
@@ -99,7 +100,7 @@ class EmailAccountValidityStore:
             # state includes an expiration timestamp close to now + validity period, but
             # is slightly randomised to avoid sending huge bursts of renewal emails at
             # once.
-            default_expiration_ts = self._api.current_time_ms() + self._period
+            default_expiration_ts = int(time.time() * 1000) + self._period
             for user in missing_users:
                 if users_to_insert.get(user["name"]) is None:
                     users_to_insert[user["name"]] = {
@@ -164,7 +165,7 @@ class EmailAccountValidityStore:
         return await self._api.run_db_interaction(
             "get_users_expiring_soon",
             select_users_txn,
-            self._api.current_time_ms(),
+            int(time.time() * 1000),
             self._renew_at,
         )
 
@@ -315,7 +316,7 @@ class EmailAccountValidityStore:
         Args:
             user_id: User ID to set an expiration date for.
         """
-        now_ms = self._api.current_time_ms()
+        now_ms = int(time.time() * 1000)
         expiration_ts = now_ms + self._period
 
         sql = """

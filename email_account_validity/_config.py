@@ -12,15 +12,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Optional
 
-from pkg_resources import DistributionNotFound, get_distribution
+import attr
 
-from email_account_validity.account_validity import EmailAccountValidity
 
-try:
-    __version__ = get_distribution(__name__).version
-except DistributionNotFound:
-    # package is not installed
-    pass
-
-__all__ = ["EmailAccountValidity"]
+@attr.s(frozen=True, auto_attribs=True)
+class EmailAccountValidityConfig:
+    period: int
+    renew_at: int
+    renew_email_subject: Optional[str] = None

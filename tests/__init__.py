@@ -23,6 +23,7 @@ import jinja2
 from synapse.module_api import ModuleApi
 
 from email_account_validity import EmailAccountValidity
+from email_account_validity._config import EmailAccountValidityConfig
 
 
 class SQLiteStore:
@@ -93,12 +94,6 @@ def read_templates(filenames):
     return [env.get_template(filename) for filename in filenames]
 
 
-def current_time_ms():
-    """Returns the current time in milliseconds.
-    """
-    return int(time.time() * 1000)
-
-
 async def get_profile_for_user(user_id):
     ProfileInfo = namedtuple("ProfileInfo", ("avatar_url", "display_name"))
     return ProfileInfo(None, "Izzy")
@@ -112,10 +107,10 @@ async def create_account_validity_module() -> EmailAccountValidity:
     """Starts an EmailAccountValidity module with a basic config and a mock of the
     ModuleApi.
     """
-    config = {
-        "period": 3628800000,  # 6w
-        "renew_at": 604800000,  # 1w
-    }
+    config = EmailAccountValidityConfig(
+        period=3628800000,
+        renew_at=604800000,
+    )
 
     store = SQLiteStore()
 
@@ -125,7 +120,6 @@ async def create_account_validity_module() -> EmailAccountValidity:
     module_api = mock.Mock(spec=ModuleApi)
     module_api.run_db_interaction.side_effect = store.run_db_interaction
     module_api.read_templates.side_effect = read_templates
-    module_api.current_time_ms.side_effect = current_time_ms
     module_api.get_profile_for_user.side_effect = get_profile_for_user
     module_api.send_mail.side_effect = send_mail
 

@@ -14,34 +14,39 @@
 # limitations under the License.
 
 import logging
-from typing import Any, Optional, Tuple
+import time
+from typing import Optional, Tuple
 
 from twisted.web.server import Request
 
-from synapse.api.errors import StoreError, SynapseError
-from synapse.http.servlet import parse_json_object_from_request
-from synapse.module_api import ModuleApi
-from synapse.types import UserID
-from synapse.util import stringutils
+from synapse.module_api import ModuleApi, UserID, parse_json_object_from_request
+from synapse.module_api.errors import SynapseError
 
+from email_account_validity._config import EmailAccountValidityConfig
 from email_account_validity._store import EmailAccountValidityStore
+from email_account_validity._utils import random_string
 
 logger = logging.getLogger(__name__)
 
 
 class EmailAccountValidityBase:
-    def __init__(self, config: Any, api: ModuleApi, store: EmailAccountValidityStore):
+    def __init__(
+        self,
+        config: EmailAccountValidityConfig,
+        api: ModuleApi,
+        store: EmailAccountValidityStore,
+    ):
         self._api = api
         self._store = store
 
-        self._period = config.get("period")
+        self._period = config.period
 
         (self._template_html, self._template_text,) = api.read_templates(
             ["notice_expiry.html", "notice_expiry.txt"],
         )
 
-        if "renew_email_subject" in config:
-            renew_email_subject = config["renew_email_subject"]
+        if config.renew_email_subject is not None:
+            renew_email_subject = config.renew_email_subject
         else:
             renew_email_subject = "Renew your %(app)s account"
 
@@ -102,7 +107,7 @@ class EmailAccountValidityBase:
             display_name = profile.display_name
             if display_name is None:
                 display_name = user_id
-        except StoreError:
+        except SynapseError:
             display_name = user_id
 
         renewal_token = await self.generate_renewal_token(user_id)
@@ -142,17 +147,17 @@ class EmailAccountValidityBase:
             The generated string.
 
         Raises:
-            StoreError(500): Couldn't generate a unique string after 5 attempts.
+            SynapseError(500): Couldn't generate a unique string after 5 attempts.
         """
         attempts = 0
         while attempts < 5:
             try:
-                renewal_token = stringutils.random_string(32)
+                renewal_token = random_string(32)
                 await self._store.set_renewal_token_for_user(user_id, renewal_token)
                 return renewal_token
-            except StoreError:
+            except SynapseError:
                 attempts += 1
-        raise StoreError(500, "Couldn't generate a unique string as refresh string.")
+        raise SynapseError(500, "Couldn't generate a unique string as refresh string.")
 
     async def renew_account(self, renewal_token: str) -> Tuple[bool, bool, int]:
         """Renews the account attached to a given renewal token by pushing back the
@@ -171,18 +176,13 @@ class EmailAccountValidityBase:
               * An int representing the user's expiry timestamp as milliseconds since the
                 epoch, or 0 if the token was invalid.
         """
-        if self._period is None:
-            # If a period hasn't been provided in the config, then it means this function
-            # was called from a place it shouldn't have been, e.g. the /send_mail servlet.
-            raise SynapseError(500, "Tried to renew account in unexpected place")
-
         try:
             (
                 user_id,
                 current_expiration_ts,
                 token_used_ts,
             ) = await self._store.get_user_from_renewal_token(renewal_token)
-        except StoreError:
+        except SynapseError:
             return False, False, 0
 
         # Check whether this token has already been used.
@@ -230,7 +230,7 @@ class EmailAccountValidityBase:
             New expiration date for this account, as a timestamp in
             milliseconds since epoch.
         """
-        now = self._api.current_time_ms()
+        now = int(time.time() * 1000)
         if expiration_ts is None:
             expiration_ts = now + self._period
 

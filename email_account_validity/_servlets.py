@@ -25,18 +25,39 @@ from synapse.module_api.errors import (
     InvalidClientCredentialsError,
     SynapseError,
 )
+from twisted.web.resource import Resource
 
 from email_account_validity._base import EmailAccountValidityBase
+from email_account_validity._config import EmailAccountValidityConfig
 from email_account_validity._store import EmailAccountValidityStore
+
+
+class EmailAccountValidityServlet(Resource):
+    def __init__(
+        self,
+        config: EmailAccountValidityConfig,
+        api: ModuleApi,
+        store: EmailAccountValidityStore,
+    ):
+        super().__init__()
+        self.putChild(b'renew', EmailAccountValidityRenewServlet(config, api, store))
+        self.putChild(
+            b'send_mail',
+            EmailAccountValiditySendMailServlet(config, api, store),
+        )
+        self.putChild(b'admin', EmailAccountValidityAdminServlet(config, api, store))
 
 
 class EmailAccountValidityRenewServlet(
     EmailAccountValidityBase, DirectServeHtmlResource
 ):
-    def __init__(self, config: dict, api: ModuleApi, store: EmailAccountValidityStore):
-        self._api = api
-
-        EmailAccountValidityBase.__init__(self, config, self._api, store)
+    def __init__(
+        self,
+        config: EmailAccountValidityConfig,
+        api: ModuleApi,
+        store: EmailAccountValidityStore,
+    ):
+        EmailAccountValidityBase.__init__(self, config, api, store)
         DirectServeHtmlResource.__init__(self)
 
         (
@@ -94,11 +115,14 @@ class EmailAccountValiditySendMailServlet(
     EmailAccountValidityBase,
     DirectServeJsonResource,
 ):
-    def __init__(self, config: dict, api: ModuleApi, store: EmailAccountValidityStore):
+    def __init__(
+        self,
+        config: EmailAccountValidityConfig,
+        api: ModuleApi,
+        store: EmailAccountValidityStore,
+    ):
         EmailAccountValidityBase.__init__(self, config, api, store)
         DirectServeJsonResource.__init__(self)
-
-        self._store = store
 
         if not api.public_baseurl:
             raise ConfigError("Can't send renewal emails without 'public_baseurl'")
@@ -118,12 +142,14 @@ class EmailAccountValidityAdminServlet(
     EmailAccountValidityBase,
     DirectServeJsonResource,
 ):
-    def __init__(self, config: dict, api: ModuleApi, store: EmailAccountValidityStore):
+    def __init__(
+        self,
+        config: EmailAccountValidityConfig,
+        api: ModuleApi,
+        store: EmailAccountValidityStore,
+    ):
         EmailAccountValidityBase.__init__(self, config, api, store)
         DirectServeJsonResource.__init__(self)
-
-        self._store = store
-
     async def _async_render_POST(self, request):
         """On POST requests on /admin, update the given user with the given account
         validity state, if the requester is a server admin.

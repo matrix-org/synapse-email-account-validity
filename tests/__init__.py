@@ -22,6 +22,7 @@ import jinja2
 from synapse.module_api import ModuleApi
 
 from email_account_validity import EmailAccountValidity
+from email_account_validity._config import EmailAccountValidityConfig
 
 
 class SQLiteStore:
@@ -99,13 +100,16 @@ async def send_mail(recipient, subject, html, text):
     return None
 
 
-async def create_account_validity_module(config_override={}) -> EmailAccountValidity:
+async def create_account_validity_module(config={}) -> EmailAccountValidity:
     """Starts an EmailAccountValidity module with a basic config and a mock of the
     ModuleApi.
     """
-    config = config_override
-    config.setdefault("period", "6w")
-    config.setdefault("renew_at", "1w")
+    config.update(
+        {
+            "period": "6w",
+            "renew_at": "1w",
+        }
+    )
 
     store = SQLiteStore()
 
@@ -120,8 +124,8 @@ async def create_account_validity_module(config_override={}) -> EmailAccountVali
 
     # Make sure the table is created. Don't try to populate with users since we don't
     # have tables to populate from.
-    config = EmailAccountValidity.parse_config(config)
-    module = EmailAccountValidity(config, module_api, populate_users=False)
+    parsed_config = EmailAccountValidity.parse_config(config)
+    module = EmailAccountValidity(parsed_config, module_api, populate_users=False)
     await module._store.create_and_populate_table(populate_users=False)
 
     return module

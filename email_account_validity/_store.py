@@ -21,6 +21,8 @@ from typing import Dict, List, Optional, Tuple, Union
 from synapse.module_api import DatabasePool, LoggingTransaction, ModuleApi, cached
 from synapse.module_api.errors import SynapseError
 
+from email_account_validity._config import EmailAccountValidityConfig
+
 logger = logging.getLogger(__name__)
 
 _LONG_TOKEN_COLUMN_NAME = "long_renewal_token"
@@ -28,14 +30,14 @@ _SHORT_TOKEN_COLUMN_NAME = "short_renewal_token"
 
 
 class EmailAccountValidityStore:
-    def __init__(self, config: dict, api: ModuleApi):
+    def __init__(self, config: EmailAccountValidityConfig, api: ModuleApi):
         self._api = api
-        self._period = config["period"]
-        self._renew_at = config["renew_at"]
+        self._period = config.period
+        self._renew_at = config.renew_at
         self._expiration_ts_max_delta = self._period * 10.0 / 100.0
         self._rand = random.SystemRandom()
 
-        use_long_tokens = config.get("send_links", True)
+        use_long_tokens = config.send_links
         self._token_column_name = (
             _LONG_TOKEN_COLUMN_NAME
             if use_long_tokens
@@ -126,8 +128,7 @@ class EmailAccountValidityStore:
             # state includes an expiration timestamp close to now + validity period, but
             # is slightly randomised to avoid sending huge bursts of renewal emails at
             # once.
-            now_ms = int(time.time() * 1000)
-            default_expiration_ts = now_ms + self._period
+            default_expiration_ts = int(time.time() * 1000) + self._period
             for user in missing_users:
                 if users_to_insert.get(user["name"]) is None:
                     users_to_insert[user["name"]] = {

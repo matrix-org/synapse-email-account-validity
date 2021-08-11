@@ -37,10 +37,6 @@ modules:
 
 The syntax for durations is the same as in the rest of Synapse's configuration file.
 
-Configuration parameters with matching names that appear both in `account_validity` and
-`listeners` __must__ have the same value in both places, otherwise the module will not
-behave correctly.
-
 ## Templates
 
 The templates the module will use are:
@@ -70,9 +66,13 @@ The templates the module will use are:
   with the wrong token. It doesn't get passed any variable.
 
 You can find and change the default templates [here](https://github.com/matrix-org/synapse-email-account-validity/tree/main/email_account_validity/templates).
-
+Admins can install custom templates either by changing the default ones directly, or by
+configuring Synapse with a custom template directory that contains the custom templates.
 Note that the templates directory contains two files that aren't templates (`mail.css`
 and `mail-expiry.css`), but are used by email templates to apply visual adjustments.
+
+Admins that don't need to customise their templates can just use the module as is and
+ignore the previous paragraph.
 
 ## Routes
 

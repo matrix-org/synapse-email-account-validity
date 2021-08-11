@@ -235,8 +235,8 @@ class AccountValidityEmailTestCase(aiounittest.AsyncTestCase):
 
         _, kwargs = module._api.send_mail.call_args
         path = "_synapse/client/email_account_validity/renew"
-        self.assertEqual(kwargs["html"].find(path), -1)
-        self.assertEqual(kwargs["text"].find(path), -1)
+        self.assertEqual(kwargs["html"].find(path), -1, kwargs["text"])
+        self.assertEqual(kwargs["text"].find(path), -1, kwargs["text"])
 
         # Check that the renewal token is in the right format. It should be a 8 digit
         # long string.

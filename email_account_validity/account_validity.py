@@ -23,11 +23,8 @@ from synapse.module_api import ModuleApi, run_in_background
 from synapse.module_api.errors import ConfigError
 
 from email_account_validity._base import EmailAccountValidityBase
-from email_account_validity._servlets import (
-    EmailAccountValidityAdminServlet,
-    EmailAccountValidityRenewServlet,
-    EmailAccountValiditySendMailServlet,
-)
+from email_account_validity._config import EmailAccountValidityConfig
+from email_account_validity._servlets import EmailAccountValidityServlet
 from email_account_validity._store import EmailAccountValidityStore
 from email_account_validity._utils import parse_duration
 
@@ -35,7 +32,15 @@ logger = logging.getLogger(__name__)
 
 
 class EmailAccountValidity(EmailAccountValidityBase):
-    def __init__(self, config: dict, api: ModuleApi, populate_users: bool = True):
+    def __init__(
+        self,
+        config: EmailAccountValidityConfig,
+        api: ModuleApi,
+        populate_users: bool = True,
+    ):
+        if not api.public_baseurl:
+            raise ConfigError("Can't send renewal emails without 'public_baseurl'")
+
         self._store = EmailAccountValidityStore(config, api)
         self._api = api
 
@@ -55,22 +60,9 @@ class EmailAccountValidity(EmailAccountValidityBase):
         )
 
         self._api.register_web_resource(
-            path="/_synapse/client/email_account_validity/renew",
-            resource=EmailAccountValidityRenewServlet(config, self._api, self._store)
+            path="/_synapse/client/email_account_validity",
+            resource=EmailAccountValidityServlet(config, self._api, self._store)
         )
-
-        self._api.register_web_resource(
-            path="/_synapse/client/email_account_validity/send_mail",
-            resource=EmailAccountValiditySendMailServlet(config, self._api, self._store)
-        )
-
-        self._api.register_web_resource(
-            path="/_synapse/client/email_account_validity/admin",
-            resource=EmailAccountValidityAdminServlet(config, self._api, self._store)
-        )
-
-        if not api.public_baseurl:
-            raise ConfigError("Can't send renewal emails without 'public_baseurl'")
 
     @staticmethod
     def parse_config(config: dict):
@@ -84,9 +76,13 @@ class EmailAccountValidity(EmailAccountValidityBase):
                 "'renew_at' is required when using email account validity"
             )
 
-        config["period"] = parse_duration(config["period"])
-        config["renew_at"] = parse_duration(config["renew_at"])
-        return config
+        parsed_config = EmailAccountValidityConfig(
+            period=parse_duration(config["period"]),
+            renew_at=parse_duration(config["renew_at"]),
+            renew_email_subject=config.get("renew_email_subject"),
+            send_links=config.get("send_links", True)
+        )
+        return parsed_config
 
     async def on_legacy_renew(self, renewal_token: str) -> Tuple[bool, bool, int]:
         """Attempt to renew an account and return the results of this attempt to the
@@ -132,10 +128,8 @@ class EmailAccountValidity(EmailAccountValidityBase):
             user_id: The user to check the expiration state for.
 
         Returns:
-            * A boolean indicating whether the user is expired.
-            * A boolean indicating whether it was possible to determine whether the user
-              is expired. Will be False if no expiration timestamp is associated with the
-              user.
+            A boolean indicating if the user has expired, or None if the module could not
+            figure it out (i.e. if the user has no expiration timestamp).
         """
         expiration_ts = await self._store.get_expiration_ts_for_user(user_id)
         if expiration_ts is None:

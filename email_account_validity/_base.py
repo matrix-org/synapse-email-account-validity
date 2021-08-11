@@ -23,6 +23,7 @@ from twisted.web.server import Request
 from synapse.module_api import ModuleApi, UserID, parse_json_object_from_request
 from synapse.module_api.errors import SynapseError
 
+from email_account_validity._config import EmailAccountValidityConfig
 from email_account_validity._store import EmailAccountValidityStore
 from email_account_validity._utils import (
     random_digit_string,
@@ -34,17 +35,25 @@ logger = logging.getLogger(__name__)
 
 
 class EmailAccountValidityBase:
-    def __init__(self, config: dict, api: ModuleApi, store: EmailAccountValidityStore):
+    def __init__(
+        self,
+        config: EmailAccountValidityConfig,
+        api: ModuleApi,
+        store: EmailAccountValidityStore,
+    ):
         self._api = api
         self._store = store
 
-        self._period = config["period"]
+        self._period = config.period
+        self._send_links = config.send_links
 
-        self._period = config.get("period")
-        self._send_links = config.get("send_links", True)
+        (self._template_html, self._template_text,) = api.read_templates(
+            ["notice_expiry.html", "notice_expiry.txt"],
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates"),
+        )
 
-        if "renew_email_subject" in config:
-            renew_email_subject = config["renew_email_subject"]
+        if config.renew_email_subject is not None:
+            renew_email_subject = config.renew_email_subject
         else:
             renew_email_subject = "Renew your %(app)s account"
 
@@ -54,11 +63,6 @@ class EmailAccountValidityBase:
         except (KeyError, TypeError):
             # If substitution failed, fall back to the bare strings.
             self._renew_email_subject = renew_email_subject
-
-        (self._template_html, self._template_text,) = api.read_templates(
-            ["notice_expiry.html", "notice_expiry.txt"],
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates"),
-        )
 
     async def send_renewal_email_to_user(self, user_id: str) -> None:
         """

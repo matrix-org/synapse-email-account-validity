@@ -22,6 +22,15 @@ from typing import Union
 UNAUTHENTICATED_TOKEN_REGEX = re.compile('^[a-zA-Z]{32}$')
 
 
+class TokenFormat:
+    """Supported formats for renewal tokens."""
+
+    # A LONG renewal token is a 32 letter-long string.
+    LONG = "long"
+    # A SHORT renewal token is a 8 digit-long string.
+    SHORT = "short"
+
+
 def random_digit_string(length):
     return "".join(secrets.choice(string.digits) for _ in range(length))
 

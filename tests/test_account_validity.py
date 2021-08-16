@@ -24,7 +24,7 @@ import aiounittest
 
 from synapse.module_api.errors import SynapseError
 
-from email_account_validity._utils import UNAUTHENTICATED_TOKEN_REGEX
+from email_account_validity._utils import UNAUTHENTICATED_TOKEN_REGEX, TokenFormat
 from tests import create_account_validity_module
 
 
@@ -146,7 +146,10 @@ class AccountValidityEmailTestCase(aiounittest.AsyncTestCase):
         old_expiration_ts = await module._store.get_expiration_ts_for_user(user_id)
         self.assertIsInstance(old_expiration_ts, int)
 
-        renewal_token = await module._store.get_renewal_token_for_user(user_id)
+        renewal_token = await module._store.get_renewal_token_for_user(
+            user_id,
+            TokenFormat.LONG,
+        )
         self.assertIsInstance(renewal_token, str)
         self.assertGreater(len(renewal_token), 0)
         self.assertTrue(UNAUTHENTICATED_TOKEN_REGEX.match(renewal_token))
@@ -202,18 +205,20 @@ class AccountValidityEmailTestCase(aiounittest.AsyncTestCase):
         await module._store.set_expiration_date_for_user(user_id_2)
 
         # Set the renewal token.
-        await module._store.set_renewal_token_for_user(user_id_1, token)
+        await module._store.set_renewal_token_for_user(user_id_1, token, TokenFormat.LONG)
 
         # Try to set the same renewal token for another user.
         exception = None
         try:
-            await module._store.set_renewal_token_for_user(user_id_2, token)
+            await module._store.set_renewal_token_for_user(
+                user_id_2, token, TokenFormat.LONG,
+            )
         except SynapseError as e:
             exception = e
 
         # Check that an exception was raised and that it's the one we're expecting.
         self.assertIsInstance(exception, SynapseError)
-        self.assertEqual(exception.code, 409)
+        self.assertEqual(exception.code, 500)
 
     async def test_send_link_false(self):
         user_id = "@izzy:test"
@@ -240,6 +245,6 @@ class AccountValidityEmailTestCase(aiounittest.AsyncTestCase):
 
         # Check that the renewal token is in the right format. It should be a 8 digit
         # long string.
-        token = await module._store.get_renewal_token_for_user(user_id)
+        token = await module._store.get_renewal_token_for_user(user_id, TokenFormat.SHORT)
         self.assertIsInstance(token, str)
         self.assertTrue(re.compile("^[0-9]{8}$").match(token))

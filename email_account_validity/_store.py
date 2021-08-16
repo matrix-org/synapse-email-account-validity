@@ -22,11 +22,15 @@ from synapse.module_api import DatabasePool, LoggingTransaction, ModuleApi, cach
 from synapse.module_api.errors import SynapseError
 
 from email_account_validity._config import EmailAccountValidityConfig
+from email_account_validity._utils import TokenFormat
 
 logger = logging.getLogger(__name__)
 
-_LONG_TOKEN_COLUMN_NAME = "long_renewal_token"
-_SHORT_TOKEN_COLUMN_NAME = "short_renewal_token"
+# The name of the column to look at for each type of renewal token.
+_TOKEN_COLUMN_NAME = {
+    TokenFormat.LONG: "long_renewal_token",
+    TokenFormat.SHORT: "short_renewal_token",
+}
 
 
 class EmailAccountValidityStore:
@@ -36,13 +40,6 @@ class EmailAccountValidityStore:
         self._renew_at = config.renew_at
         self._expiration_ts_max_delta = self._period * 10.0 / 100.0
         self._rand = random.SystemRandom()
-
-        use_long_tokens = config.send_links
-        self._token_column_name = (
-            _LONG_TOKEN_COLUMN_NAME
-            if use_long_tokens
-            else _SHORT_TOKEN_COLUMN_NAME
-        )
 
     async def create_and_populate_table(self, populate_users: bool = True):
         """Create the email_account_validity table and populate it from other tables from
@@ -54,11 +51,22 @@ class EmailAccountValidityStore:
             txn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS email_account_validity(
+                    -- The user's Matrix ID.
                     user_id TEXT PRIMARY KEY,
+                    -- The expiration timestamp for this user in milliseconds.
                     expiration_ts_ms BIGINT NOT NULL,
+                    -- Whether a renewal email has already been sent to this user.
                     email_sent BOOLEAN NOT NULL,
+                    -- Long renewal tokens, which are unique to the whole table, so that
+                    -- renewing an account using one doesn't require further
+                    -- authentication.
                     long_renewal_token TEXT,
+                    -- Short renewal tokens, which aren't unique to the whole table, and
+                    -- with which renewing an account requires authentication using an
+                    -- access token.
                     short_renewal_token TEXT,
+                    -- Timestamp at which the renewal token for the user has been used,
+                    -- or NULL if it hasn't been used yet.
                     token_used_ts_ms BIGINT
                 )
                 """,
@@ -194,7 +202,6 @@ class EmailAccountValidityStore:
         return await self._api.run_db_interaction(
             "get_users_expiring_soon",
             select_users_txn,
-            int(time.time() * 1000),
             self._renew_at,
         )
 
@@ -203,6 +210,7 @@ class EmailAccountValidityStore:
         user_id: str,
         expiration_ts: int,
         email_sent: bool,
+        token_format: TokenFormat,
         renewal_token: Optional[str] = None,
         token_used_ts: Optional[int] = None,
     ):
@@ -216,6 +224,8 @@ class EmailAccountValidityStore:
             email_sent: True means a renewal email has been sent for this account
                 and there's no need to send another one for the current validity
                 period.
+            token_format: The configured token format, used to determine which
+                column to update.
             renewal_token: Renewal token the user can use to extend the validity
                 of their account. Defaults to no token.
             token_used_ts: A timestamp of when the current token was used to renew
@@ -239,7 +249,7 @@ class EmailAccountValidityStore:
                     email_sent = EXCLUDED.email_sent,
                     %(token_column_name)s = EXCLUDED.%(token_column_name)s,
                     token_used_ts_ms = EXCLUDED.token_used_ts_ms
-                """ % {"token_column_name": self._token_column_name},
+                """ % {"token_column_name": _TOKEN_COLUMN_NAME[token_format]},
                 (user_id, expiration_ts, email_sent, renewal_token, token_used_ts)
             )
 
@@ -280,12 +290,15 @@ class EmailAccountValidityStore:
         self,
         user_id: str,
         renewal_token: str,
+        token_format: TokenFormat,
     ):
         """Store the given renewal token for the given user.
 
         Args:
             user_id: The user ID to store the renewal token for.
             renewal_token: The renewal token to store for the user.
+            token_format: The configured token format, used to determine which
+                column to update.
         """
         def set_renewal_token_for_user_txn(txn: LoggingTransaction):
             # We don't need to check if the token is unique since we've got unique
@@ -296,12 +309,12 @@ class EmailAccountValidityStore:
                     table="email_account_validity",
                     keyvalues={"user_id": user_id},
                     updatevalues={
-                        self._token_column_name: renewal_token,
+                        _TOKEN_COLUMN_NAME[token_format]: renewal_token,
                         "token_used_ts_ms": None,
                     },
                 )
             except Exception:
-                raise SynapseError(409, "Renewal token already in use")
+                raise SynapseError(500, "Failed to update renewal token")
 
         await self._api.run_db_interaction(
             "set_renewal_token_for_user",
@@ -309,7 +322,10 @@ class EmailAccountValidityStore:
         )
 
     async def validate_renewal_token(
-        self, renewal_token: str, user_id: Optional[str] = None,
+        self,
+        renewal_token: str,
+        token_format: TokenFormat,
+        user_id: Optional[str] = None,
     ) -> Tuple[str, int, Optional[int]]:
         """Check if the provided renewal token is associating with a user, optionally
         validating the user it belongs to as well, and return the account renewal status
@@ -317,6 +333,8 @@ class EmailAccountValidityStore:
 
         Args:
             renewal_token: The renewal token to perform the lookup with.
+            token_format: The configured token format, used to determine which
+                column to update.
             user_id: The Matrix ID of the user to renew, if the renewal request was
                 authenticated.
 
@@ -330,12 +348,12 @@ class EmailAccountValidityStore:
                     account has not been renewed using the current token yet.
 
         Raises:
-            SynapseError(404): The token could not be found (or does not belong to the
+            StoreError(404): The token could not be found (or does not belong to the
                 provided user, if any).
         """
 
         def get_user_from_renewal_token_txn(txn: LoggingTransaction):
-            keyvalues = {self._token_column_name: renewal_token}
+            keyvalues = {_TOKEN_COLUMN_NAME[token_format]: renewal_token}
             if user_id is not None:
                 keyvalues["user_id"] = user_id
 
@@ -414,11 +432,17 @@ class EmailAccountValidityStore:
             set_renewal_mail_status_txn,
         )
 
-    async def get_renewal_token_for_user(self, user_id: str) -> str:
+    async def get_renewal_token_for_user(
+        self,
+        user_id: str,
+        token_format: TokenFormat,
+    ) -> str:
         """Retrieve the renewal token for the given user.
 
         Args:
             user_id: Matrix ID of the user to retrieve the renewal token of.
+            token_format: The configured token format, used to determine which
+                column to update.
 
         Returns:
             The renewal token for the user.
@@ -429,7 +453,7 @@ class EmailAccountValidityStore:
                 txn=txn,
                 table="email_account_validity",
                 keyvalues={"user_id": user_id},
-                retcol=self._token_column_name,
+                retcol=_TOKEN_COLUMN_NAME[token_format],
             )
 
         return await self._api.run_db_interaction(

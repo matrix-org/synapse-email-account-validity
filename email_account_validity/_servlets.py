@@ -142,14 +142,6 @@ class EmailAccountValidityAdminServlet(
     EmailAccountValidityBase,
     DirectServeJsonResource,
 ):
-    def __init__(
-        self,
-        config: EmailAccountValidityConfig,
-        api: ModuleApi,
-        store: EmailAccountValidityStore,
-    ):
-        EmailAccountValidityBase.__init__(self, config, api, store)
-        DirectServeJsonResource.__init__(self)
     async def _async_render_POST(self, request):
         """On POST requests on /admin, update the given user with the given account
         validity state, if the requester is a server admin.

@@ -26,9 +26,11 @@ from synapse.module_api.errors import SynapseError
 from email_account_validity._config import EmailAccountValidityConfig
 from email_account_validity._store import EmailAccountValidityStore
 from email_account_validity._utils import (
+    LONG_TOKEN_REGEX,
+    SHORT_TOKEN_REGEX,
     random_digit_string,
     random_string,
-    UNAUTHENTICATED_TOKEN_REGEX, TokenFormat,
+    TokenFormat,
 )
 
 logger = logging.getLogger(__name__)
@@ -225,11 +227,19 @@ class EmailAccountValidityBase:
               * An int representing the user's expiry timestamp as milliseconds since the
                 epoch, or 0 if the token was invalid.
         """
-        is_long_token = UNAUTHENTICATED_TOKEN_REGEX.match(renewal_token)
+        # Try to match the token against a known format.
+        if LONG_TOKEN_REGEX.match(renewal_token):
+            token_format = TokenFormat.LONG
+        elif SHORT_TOKEN_REGEX.match(renewal_token):
+            token_format = TokenFormat.SHORT
+        else:
+            # If we can't figure out what format the renewal token is, consider it
+            # invalid.
+            return False, False, 0
 
         # If we were not able to authenticate the user requesting a renewal, and the
         # token needs authentication, consider the token neither valid nor stale.
-        if user_id is None and not is_long_token:
+        if user_id is None and token_format == TokenFormat.SHORT:
             return False, False, 0
 
         # Verify if the token, or the (token, user_id) tuple, exists.
@@ -240,7 +250,7 @@ class EmailAccountValidityBase:
                 token_used_ts,
             ) = await self._store.validate_renewal_token(
                 renewal_token,
-                TokenFormat.LONG if is_long_token else TokenFormat.SHORT,
+                token_format,
                 user_id,
             )
         except SynapseError:

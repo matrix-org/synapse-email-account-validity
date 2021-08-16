@@ -19,7 +19,8 @@ import string
 from typing import Union
 
 
-UNAUTHENTICATED_TOKEN_REGEX = re.compile('^[a-zA-Z]{32}$')
+LONG_TOKEN_REGEX = re.compile('^[a-zA-Z]{32}$')
+SHORT_TOKEN_REGEX = re.compile('^[0-9]{8}$')
 
 
 class TokenFormat:

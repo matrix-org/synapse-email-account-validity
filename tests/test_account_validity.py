@@ -24,7 +24,7 @@ import aiounittest
 
 from synapse.module_api.errors import SynapseError
 
-from email_account_validity._utils import UNAUTHENTICATED_TOKEN_REGEX, TokenFormat
+from email_account_validity._utils import LONG_TOKEN_REGEX, SHORT_TOKEN_REGEX, TokenFormat
 from tests import create_account_validity_module
 
 
@@ -152,7 +152,7 @@ class AccountValidityEmailTestCase(aiounittest.AsyncTestCase):
         )
         self.assertIsInstance(renewal_token, str)
         self.assertGreater(len(renewal_token), 0)
-        self.assertTrue(UNAUTHENTICATED_TOKEN_REGEX.match(renewal_token))
+        self.assertTrue(LONG_TOKEN_REGEX.match(renewal_token))
 
         # Sleep a bit so the new expiration timestamp isn't likely to be equal to the
         # previous one.
@@ -247,4 +247,4 @@ class AccountValidityEmailTestCase(aiounittest.AsyncTestCase):
         # long string.
         token = await module._store.get_renewal_token_for_user(user_id, TokenFormat.SHORT)
         self.assertIsInstance(token, str)
-        self.assertTrue(re.compile("^[0-9]{8}$").match(token))
+        self.assertTrue(SHORT_TOKEN_REGEX.match(token))

@@ -33,6 +33,12 @@ modules:
       period: 6w
       # How long before an account expires should Synapse send it a renewal email.
       renew_at: 1w
+      # Whether to include a link to click in the emails sent to users. If false, only a
+      # renewal token is sent, in which case a shorter token is used, and the
+      # user will need to copy it into a compatible client that will send an
+      # authenticated request to the server.
+      # Defaults to true.
+      send_links: true
 ```
 
 The syntax for durations is the same as in the rest of Synapse's configuration file.

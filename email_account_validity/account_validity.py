@@ -80,6 +80,7 @@ class EmailAccountValidity(EmailAccountValidityBase):
             period=parse_duration(config["period"]),
             renew_at=parse_duration(config["renew_at"]),
             renew_email_subject=config.get("renew_email_subject"),
+            send_links=config.get("send_links", True)
         )
         return parsed_config
 

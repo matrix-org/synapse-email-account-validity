@@ -15,7 +15,6 @@
 
 from collections import namedtuple
 import sqlite3
-import pkg_resources
 import time
 from unittest import mock
 
@@ -70,13 +69,11 @@ class CursorWrapper:
         return self.cur.__next__()
 
 
-def read_templates(filenames):
+def read_templates(filenames, directory):
     """Reads Jinja templates from the templates directory. This function is mostly copied
     from Synapse.
     """
-    loader = jinja2.FileSystemLoader(
-        pkg_resources.resource_filename("email_account_validity", "templates")
-    )
+    loader = jinja2.FileSystemLoader(directory)
     env = jinja2.Environment(
         loader=loader,
         autoescape=jinja2.select_autoescape(),
@@ -103,13 +100,15 @@ async def send_mail(recipient, subject, html, text):
     return None
 
 
-async def create_account_validity_module() -> EmailAccountValidity:
+async def create_account_validity_module(config={}) -> EmailAccountValidity:
     """Starts an EmailAccountValidity module with a basic config and a mock of the
     ModuleApi.
     """
-    config = EmailAccountValidityConfig(
-        period=3628800000,
-        renew_at=604800000,
+    config.update(
+        {
+            "period": "6w",
+            "renew_at": "1w",
+        }
     )
 
     store = SQLiteStore()
@@ -125,7 +124,8 @@ async def create_account_validity_module() -> EmailAccountValidity:
 
     # Make sure the table is created. Don't try to populate with users since we don't
     # have tables to populate from.
-    module = EmailAccountValidity(config, module_api, populate_users=False)
+    parsed_config = EmailAccountValidity.parse_config(config)
+    module = EmailAccountValidity(parsed_config, module_api, populate_users=False)
     await module._store.create_and_populate_table(populate_users=False)
 
     return module

@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
 
 from synapse.module_api import (
     DirectServeHtmlResource,
@@ -19,7 +20,11 @@ from synapse.module_api import (
     ModuleApi,
     respond_with_html,
 )
-from synapse.module_api.errors import ConfigError, SynapseError
+from synapse.module_api.errors import (
+    ConfigError,
+    InvalidClientCredentialsError,
+    SynapseError,
+)
 from twisted.web.resource import Resource
 
 from email_account_validity._base import EmailAccountValidityBase
@@ -64,7 +69,8 @@ class EmailAccountValidityRenewServlet(
                 "account_renewed.html",
                 "account_previously_renewed.html",
                 "invalid_token.html",
-            ]
+            ],
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates"),
         )
 
     async def _async_render_GET(self, request):
@@ -76,11 +82,17 @@ class EmailAccountValidityRenewServlet(
 
         renewal_token = request.args[b"token"][0].decode("utf-8")
 
+        try:
+            requester = await self._api.get_user_by_req(request, allow_expired=True)
+            user_id = requester.user.to_string()
+        except InvalidClientCredentialsError:
+            user_id = None
+
         (
             token_valid,
             token_stale,
             expiration_ts,
-        ) = await self.renew_account(renewal_token)
+        ) = await self.renew_account(renewal_token, user_id)
 
         if token_valid:
             status_code = 200
@@ -93,7 +105,7 @@ class EmailAccountValidityRenewServlet(
                 expiration_ts=expiration_ts
             )
         else:
-            status_code = 404
+            status_code = 400
             response = self._invalid_token_template.render()
 
         respond_with_html(request, status_code, response)
@@ -130,15 +142,6 @@ class EmailAccountValidityAdminServlet(
     EmailAccountValidityBase,
     DirectServeJsonResource,
 ):
-    def __init__(
-        self,
-        config: EmailAccountValidityConfig,
-        api: ModuleApi,
-        store: EmailAccountValidityStore,
-    ):
-        EmailAccountValidityBase.__init__(self, config, api, store)
-        DirectServeJsonResource.__init__(self)
-
     async def _async_render_POST(self, request):
         """On POST requests on /admin, update the given user with the given account
         validity state, if the requester is a server admin.

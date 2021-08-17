@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import asyncio
+import re
 import time
 
 # From Python 3.8 onwards, aiounittest.AsyncTestCase can be replaced by
@@ -23,7 +24,7 @@ import aiounittest
 
 from synapse.module_api.errors import SynapseError
 
-from email_account_validity import EmailAccountValidity
+from email_account_validity._utils import LONG_TOKEN_REGEX, SHORT_TOKEN_REGEX, TokenFormat
 from tests import create_account_validity_module
 
 
@@ -81,7 +82,7 @@ class AccountValidityHooksTestCase(aiounittest.AsyncTestCase):
         expiration_ts = await module._store.get_expiration_ts_for_user(user_id)
         now_ms = int(time.time() * 1000)
 
-        self.assertTrue(isinstance(expiration_ts, int))
+        self.assertIsInstance(expiration_ts, int)
         self.assertGreater(expiration_ts, now_ms)
 
 
@@ -119,6 +120,13 @@ class AccountValidityEmailTestCase(aiounittest.AsyncTestCase):
         await module.send_renewal_email_to_user(user_id)
         self.assertEqual(module._api.send_mail.call_count, 1)
 
+        # Test that the email content contains a link; we haven't set send_links in the
+        # module's config so its value should be the default (which is True).
+        _, kwargs = module._api.send_mail.call_args
+        path = "_synapse/client/email_account_validity/renew"
+        self.assertNotEqual(kwargs["html"].find(path), -1)
+        self.assertNotEqual(kwargs["text"].find(path), -1)
+
         # Test that trying to send an email to a known use that has no email address
         # attached to their account results in no email being sent.
         threepids = []
@@ -127,20 +135,24 @@ class AccountValidityEmailTestCase(aiounittest.AsyncTestCase):
 
     async def test_renewal_token(self):
         user_id = "@izzy:test"
-        module = await create_account_validity_module()  # type: EmailAccountValidity
+        module = await create_account_validity_module()
 
         # Insert a row with an expiration timestamp and a renewal token for this user.
         await module._store.set_expiration_date_for_user(user_id)
-        await module.generate_renewal_token(user_id)
+        await module.generate_unauthenticated_renewal_token(user_id)
 
         # Retrieve the expiration timestamp and renewal token and check that they're in
         # the right format.
         old_expiration_ts = await module._store.get_expiration_ts_for_user(user_id)
-        self.assertTrue(isinstance(old_expiration_ts, int))
+        self.assertIsInstance(old_expiration_ts, int)
 
-        renewal_token = await module._store.get_renewal_token_for_user(user_id)
-        self.assertTrue(isinstance(renewal_token, str))
+        renewal_token = await module._store.get_renewal_token_for_user(
+            user_id,
+            TokenFormat.LONG,
+        )
+        self.assertIsInstance(renewal_token, str)
         self.assertGreater(len(renewal_token), 0)
+        self.assertTrue(LONG_TOKEN_REGEX.match(renewal_token))
 
         # Sleep a bit so the new expiration timestamp isn't likely to be equal to the
         # previous one.
@@ -181,3 +193,58 @@ class AccountValidityEmailTestCase(aiounittest.AsyncTestCase):
         self.assertFalse(token_stale)
         self.assertEqual(expiration_ts, 0)
 
+    async def test_duplicate_token(self):
+        user_id_1 = "@izzy1:test"
+        user_id_2 = "@izzy2:test"
+        token = "sometoken"
+
+        module = await create_account_validity_module()
+
+        # Insert both users in the table.
+        await module._store.set_expiration_date_for_user(user_id_1)
+        await module._store.set_expiration_date_for_user(user_id_2)
+
+        # Set the renewal token.
+        await module._store.set_renewal_token_for_user(user_id_1, token, TokenFormat.LONG)
+
+        # Try to set the same renewal token for another user.
+        exception = None
+        try:
+            await module._store.set_renewal_token_for_user(
+                user_id_2, token, TokenFormat.LONG,
+            )
+        except SynapseError as e:
+            exception = e
+
+        # Check that an exception was raised and that it's the one we're expecting.
+        self.assertIsInstance(exception, SynapseError)
+        self.assertEqual(exception.code, 500)
+
+    async def test_send_link_false(self):
+        user_id = "@izzy:test"
+        # Create a module with a configuration forbidding it to send links via email.
+        module = await create_account_validity_module({"send_links": False})
+
+        async def get_threepids(user_id):
+            return [{
+                "medium": "email",
+                "address": "izzy@test",
+            }]
+        module._api.get_threepids_for_user.side_effect = get_threepids
+        await module._store.set_expiration_date_for_user(user_id)
+
+        # Test that, when an email is sent, it doesn't include a link. We do this by
+        # searching the email's content for the path for renewal requests.
+        await module.send_renewal_email_to_user(user_id)
+        self.assertEqual(module._api.send_mail.call_count, 1)
+
+        _, kwargs = module._api.send_mail.call_args
+        path = "_synapse/client/email_account_validity/renew"
+        self.assertEqual(kwargs["html"].find(path), -1, kwargs["text"])
+        self.assertEqual(kwargs["text"].find(path), -1, kwargs["text"])
+
+        # Check that the renewal token is in the right format. It should be a 8 digit
+        # long string.
+        token = await module._store.get_renewal_token_for_user(user_id, TokenFormat.SHORT)
+        self.assertIsInstance(token, str)
+        self.assertTrue(SHORT_TOKEN_REGEX.match(token))

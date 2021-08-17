@@ -2,10 +2,16 @@
 
 A Synapse plugin module to manage account validity using validation emails.
 
+After a configured time, this module automatically expires user accounts. When a user is
+expired, Synapse will respond to any request authenticated by the user's access token
+with a 403 error containing the `ORG_MATRIX_EXPIRED_ACCOUNT` error code. Some time before
+an account expires (defined by the module's configuration), an email is sent to the user
+with instructions to renew the validity of their account.
+
 This module requires:
 
 * Synapse >= 1.39.0
-* sqlite3 >= 3.24.0 (if using SQLite with Synapse)
+* sqlite3 >= 3.24.0 (if using SQLite with Synapse (not recommended))
 
 ## Installation
 

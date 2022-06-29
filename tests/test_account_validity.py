@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import asyncio
-import re
 import time
 
 # From Python 3.8 onwards, aiounittest.AsyncTestCase can be replaced by

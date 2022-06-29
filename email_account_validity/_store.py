@@ -154,7 +154,26 @@ class EmailAccountValidityStore:
             DatabasePool.simple_insert_many_txn(
                 txn=txn,
                 table="email_account_validity",
-                values=list(users_to_insert.values()),
+                keys=[
+                    "user_id",
+                    "expiration_ts_ms",
+                    "email_sent",
+                    "long_renewal_token",
+                    "token_used_ts_ms",
+                ],
+                values=[
+                    (
+                        user["user_id"],
+                        user["expiration_ts_ms"],
+                        user["email_sent"],
+                        # If there's a renewal token for the user, we consider it's a long
+                        # one, because the non-module implementation of account validity
+                        # doesn't have a concept of short tokens.
+                        user["renewal_token"],
+                        user["token_used_ts_ms"],
+                    )
+                    for user in users_to_insert.values()
+                ],
             )
 
             return len(missing_users)

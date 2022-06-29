@@ -48,25 +48,28 @@ class EmailAccountValidityStore:
         """
         def create_table_txn(txn: LoggingTransaction):
             # Try to create a table for the module.
+
+            # The table we create has the following columns:
+            #
+            # * user_id: The user's Matrix ID.
+            # * expiration_ts_ms: The expiration timestamp for this user in milliseconds.
+            # * email_sent: Whether a renewal email has already been sent to this user
+            # * long_renewal_token: Long renewal tokens, which are unique to the whole
+            #                       table, so that renewing an account using one doesn't
+            #                       require further authentication.
+            # * short_renewal_token: Short renewal tokens, which aren't unique to the
+            #                        whole table, and with which renewing an account
+            #                        requires authentication using an access token.
+            # * token_used_ts_ms: Timestamp at which the renewal token for the user has
+            #                     been used, or NULL if it hasn't been used yet.
             txn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS email_account_validity(
-                    -- The user's Matrix ID.
                     user_id TEXT PRIMARY KEY,
-                    -- The expiration timestamp for this user in milliseconds.
                     expiration_ts_ms BIGINT NOT NULL,
-                    -- Whether a renewal email has already been sent to this user.
                     email_sent BOOLEAN NOT NULL,
-                    -- Long renewal tokens, which are unique to the whole table, so that
-                    -- renewing an account using one doesn't require further
-                    -- authentication.
                     long_renewal_token TEXT,
-                    -- Short renewal tokens, which aren't unique to the whole table, and
-                    -- with which renewing an account requires authentication using an
-                    -- access token.
                     short_renewal_token TEXT,
-                    -- Timestamp at which the renewal token for the user has been used,
-                    -- or NULL if it hasn't been used yet.
                     token_used_ts_ms BIGINT
                 )
                 """,

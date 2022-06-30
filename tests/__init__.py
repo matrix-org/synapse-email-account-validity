@@ -22,7 +22,6 @@ import jinja2
 from synapse.module_api import ModuleApi
 
 from email_account_validity import EmailAccountValidity
-from email_account_validity._config import EmailAccountValidityConfig
 
 
 class SQLiteStore:

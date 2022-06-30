@@ -48,25 +48,28 @@ class EmailAccountValidityStore:
         """
         def create_table_txn(txn: LoggingTransaction):
             # Try to create a table for the module.
+
+            # The table we create has the following columns:
+            #
+            # * user_id: The user's Matrix ID.
+            # * expiration_ts_ms: The expiration timestamp for this user in milliseconds.
+            # * email_sent: Whether a renewal email has already been sent to this user
+            # * long_renewal_token: Long renewal tokens, which are unique to the whole
+            #                       table, so that renewing an account using one doesn't
+            #                       require further authentication.
+            # * short_renewal_token: Short renewal tokens, which aren't unique to the
+            #                        whole table, and with which renewing an account
+            #                        requires authentication using an access token.
+            # * token_used_ts_ms: Timestamp at which the renewal token for the user has
+            #                     been used, or NULL if it hasn't been used yet.
             txn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS email_account_validity(
-                    -- The user's Matrix ID.
                     user_id TEXT PRIMARY KEY,
-                    -- The expiration timestamp for this user in milliseconds.
                     expiration_ts_ms BIGINT NOT NULL,
-                    -- Whether a renewal email has already been sent to this user.
                     email_sent BOOLEAN NOT NULL,
-                    -- Long renewal tokens, which are unique to the whole table, so that
-                    -- renewing an account using one doesn't require further
-                    -- authentication.
                     long_renewal_token TEXT,
-                    -- Short renewal tokens, which aren't unique to the whole table, and
-                    -- with which renewing an account requires authentication using an
-                    -- access token.
                     short_renewal_token TEXT,
-                    -- Timestamp at which the renewal token for the user has been used,
-                    -- or NULL if it hasn't been used yet.
                     token_used_ts_ms BIGINT
                 )
                 """,
@@ -154,7 +157,26 @@ class EmailAccountValidityStore:
             DatabasePool.simple_insert_many_txn(
                 txn=txn,
                 table="email_account_validity",
-                values=list(users_to_insert.values()),
+                keys=[
+                    "user_id",
+                    "expiration_ts_ms",
+                    "email_sent",
+                    "long_renewal_token",
+                    "token_used_ts_ms",
+                ],
+                values=[
+                    (
+                        user["user_id"],
+                        user["expiration_ts_ms"],
+                        user["email_sent"],
+                        # If there's a renewal token for the user, we consider it's a long
+                        # one, because the non-module implementation of account validity
+                        # doesn't have a concept of short tokens.
+                        user["renewal_token"],
+                        user["token_used_ts_ms"],
+                    )
+                    for user in users_to_insert.values()
+                ],
             )
 
             return len(missing_users)

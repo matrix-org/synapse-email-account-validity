@@ -41,6 +41,8 @@ class EmailAccountValidityStore:
         self._expiration_ts_max_delta = self._period * 10.0 / 100.0
         self._rand = random.SystemRandom()
 
+        self._api.register_cached_function(self.get_expiration_ts_for_user)
+
     async def create_and_populate_table(self, populate_users: bool = True):
         """Create the email_account_validity table and populate it from other tables from
         within Synapse. It populates users in it by batches of 100 in order not to clog up
@@ -275,12 +277,12 @@ class EmailAccountValidityStore:
                 (user_id, expiration_ts, email_sent, renewal_token, token_used_ts)
             )
 
-            txn.call_after(self.get_expiration_ts_for_user.invalidate, (user_id,))
-
         await self._api.run_db_interaction(
             "set_account_validity_for_user",
             set_account_validity_for_user_txn,
         )
+
+        await self._api.invalidate_cache(self.get_expiration_ts_for_user, (user_id,))
 
     @cached()
     async def get_expiration_ts_for_user(self, user_id: str) -> int:

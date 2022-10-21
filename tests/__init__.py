@@ -99,6 +99,10 @@ async def send_mail(recipient, subject, html, text):
     return None
 
 
+async def invalidate_cache(cached_func, keys):
+    cached_func.invalidate(keys)
+
+
 async def create_account_validity_module(config={}) -> EmailAccountValidity:
     """Starts an EmailAccountValidity module with a basic config and a mock of the
     ModuleApi.
@@ -120,6 +124,7 @@ async def create_account_validity_module(config={}) -> EmailAccountValidity:
     module_api.read_templates.side_effect = read_templates
     module_api.get_profile_for_user.side_effect = get_profile_for_user
     module_api.send_mail.side_effect = send_mail
+    module_api.invalidate_cache.side_effect = invalidate_cache
 
     # Make sure the table is created. Don't try to populate with users since we don't
     # have tables to populate from.

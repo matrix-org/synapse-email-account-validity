@@ -156,12 +156,12 @@ class EmailAccountValidity(EmailAccountValidityBase):
 
         if expiring_users:
             for user in expiring_users:
-                if user["expiration_ts_ms"] is None:
+                if user[1] is None:
                     logger.warning(
                         "User %s has no expiration ts, ignoring" % user["user_id"],
                     )
                     continue
 
                 await self.send_renewal_email(
-                    user_id=user["user_id"], expiration_ts=user["expiration_ts_ms"]
+                    user_id=user[0], expiration_ts=user[1]
                 )

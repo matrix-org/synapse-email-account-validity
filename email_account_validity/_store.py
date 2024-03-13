@@ -108,7 +108,7 @@ class EmailAccountValidityStore:
                 (batch_size,),
             )
 
-            missing_users = DatabasePool.cursor_to_dict(txn)
+            missing_users = txn.fetchall()
             if not missing_users:
                 return 0
 
@@ -119,7 +119,7 @@ class EmailAccountValidityStore:
                 txn=txn,
                 table="account_validity",
                 column="user_id",
-                iterable=tuple([user["name"] for user in missing_users]),
+                iterable=tuple([user[0] for user in missing_users]),
                 keyvalues={},
                 retcols=(
                     "user_id",
@@ -143,10 +143,10 @@ class EmailAccountValidityStore:
             # once.
             default_expiration_ts = int(time.time() * 1000) + self._period
             for user in missing_users:
-                if users_to_insert.get(user["name"]) is None:
-                    users_to_insert[user["name"]] = {
-                        "user_id": user["name"],
-                        "expiration_ts_ms": self._rand.randrange(
+                if users_to_insert.get(user[0]) is None:
+                    users_to_insert[user[0]] = {
+                        "user_id": user[0],
+                        "expiration_ts_ms": self._rand.uniform(
                             default_expiration_ts - self._expiration_ts_max_delta,
                             default_expiration_ts,
                         ),
@@ -221,7 +221,7 @@ class EmailAccountValidityStore:
                 """,
                 (False, now_ms, renew_at),
             )
-            return DatabasePool.cursor_to_dict(txn)
+            return txn.fetchall()
 
         return await self._api.run_db_interaction(
             "get_users_expiring_soon",
@@ -393,7 +393,7 @@ class EmailAccountValidityStore:
             get_user_from_renewal_token_txn,
         )
 
-        return res["user_id"], res["expiration_ts_ms"], res["token_used_ts_ms"]
+        return res[0], res[1], res[2]
 
     async def set_expiration_date_for_user(self, user_id: str):
         """Sets an expiration date to the account with the given user ID.

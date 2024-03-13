@@ -21,6 +21,7 @@ import time
 # we stop supporting Python < 3.8 in Synapse.
 import aiounittest
 
+from synapse.module_api import LoggingTransaction
 from synapse.module_api.errors import SynapseError
 
 from email_account_validity._utils import LONG_TOKEN_REGEX, SHORT_TOKEN_REGEX, TokenFormat
@@ -247,3 +248,64 @@ class AccountValidityEmailTestCase(aiounittest.AsyncTestCase):
         token = await module._store.get_renewal_token_for_user(user_id, TokenFormat.SHORT)
         self.assertIsInstance(token, str)
         self.assertTrue(SHORT_TOKEN_REGEX.match(token))
+
+    async def test_create_and_populate_table(self):
+
+        def create_user_table(txn: LoggingTransaction):
+            txn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS users(
+                name TEXT,
+                password_hash TEXT,
+                creation_ts BIGINT UNSIGNED,
+                admin BOOL DEFAULT 0 NOT NULL,
+                UNIQUE(name)
+                );
+                """,
+                (),
+            )
+            txn.execute(
+                """
+                INSERT INTO users VALUES (
+                    "@jane.doe-synapse.org:dev01.synapse.org",
+                    "$2b$12$58YVjKsB58DM.YFChWQM8uP0x3rh1iaKDNSPl3Jv34LGqwn7tIure",
+                    1700823133,
+                    0
+                );
+                """,
+                (),
+            )
+            txn.execute(
+                """
+                INSERT INTO users VALUES (
+                    "@john.doe-synapse.org:dev01.synapse.org",
+                    "$2b$12$58YVjKsB58DM.YFChWQM8uP0x3rh1iaKDNSPl3Jv34LGqwn7tIure",
+                    1700823160,
+                    0
+                );
+                """,
+                (),
+            )
+            txn.execute(
+                """
+                CREATE TABLE account_validity (
+                    user_id text NOT NULL,
+                    expiration_ts_ms bigint NOT NULL,
+                    email_sent boolean NOT NULL,
+                    renewal_token text,
+                    token_used_ts_ms bigint
+                );
+                """,
+                (),
+            )
+        populate_users = True
+        module = await create_account_validity_module()
+        await module._store._api.run_db_interaction("create_user_table", create_user_table,)
+
+        await module._store.create_and_populate_table(populate_users)
+
+        # res = await module._store._api.run_db_interaction(
+        #         "", "SELECT user_id FROM email_account_validity"
+        #     )
+        #
+        # self.assertEqual(0, len(res))

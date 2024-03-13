@@ -20,6 +20,7 @@ from unittest import mock
 
 import jinja2
 from synapse.module_api import ModuleApi
+from synapse.storage.engines import create_engine, BaseDatabaseEngine
 
 from email_account_validity import EmailAccountValidity
 
@@ -33,7 +34,9 @@ class SQLiteStore:
         self.conn = sqlite3.connect(":memory:")
 
     async def run_db_interaction(self, desc, f, *args, **kwargs):
-        cur = CursorWrapper(self.conn.cursor())
+        db_config = {"name": "sqlite3"}
+        engine = create_engine(db_config)
+        cur = CursorWrapper(self.conn.cursor(), engine)
         try:
             res = f(cur, *args, **kwargs)
             self.conn.commit()
@@ -45,8 +48,9 @@ class SQLiteStore:
 
 class CursorWrapper:
     """Wrapper around a SQLite cursor that also provides a call_after method."""
-    def __init__(self, cursor: sqlite3.Cursor):
+    def __init__(self, cursor: sqlite3.Cursor, engine: BaseDatabaseEngine):
         self.cur = cursor
+        self.database_engine = engine
 
     def execute(self, sql, args):
         self.cur.execute(sql, args)
@@ -58,8 +62,14 @@ class CursorWrapper:
     def fetchone(self):
         return self.cur.fetchone()
 
+    def fetchall(self):
+        return self.cur.fetchall()
+
     def call_after(self, f, args):
         f(args)
+
+    def execute_batch(self, sql, args):
+        self.cur.executemany(sql, args)
 
     def __iter__(self):
         return self.cur.__iter__()
